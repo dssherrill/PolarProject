@@ -1,0 +1,57 @@
+[
+    {
+        "name":"ASK 21 (K1)",
+        "polarFileName":"ASK 21.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":470.0,
+        "emptyWeight": 370.8,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"ASK 21 (K2)",
+        "polarFileName":"ASK 21.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":470.0,
+        "emptyWeight": 373.1,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"ASW 28",
+        "polarFileName":"ASW 28.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":325.0,
+        "emptyWeight": 268.0,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"Duo Discus T",
+        "polarFileName":"Duo Discus T.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":700.0,
+        "emptyWeight": 462.5,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"SGS 1-26",
+        "polarFileName":"1-26.csv",
+        "speedUnits":"mph",
+        "sinkUnits":"fps",
+        "weightUnits":"lbs",
+        "referenceWeight":800.0,
+        "emptyWeight": 400.0,
+        "fitStart":50,
+        "fitEnd":200
+    }
+]
