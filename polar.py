@@ -15,41 +15,44 @@ PA_ = pint_pandas.PintArray
 Q_ = ureg.Quantity
 
 class Polar:
-    def __init__(self, currentGlider, degree, emptyWeight, pilotWeight=None):
-        self.__glider = currentGlider,
-        self.__wRef = currentGlider['referenceWeight'].iloc[0]
-        self.__wEmpty = currentGlider['emptyWeight'].iloc[0]
-        if (pilotWeight == None):
-            pilotWeight = self.__wRef - self.__wEmpty
+    def __init__(self, current_glider, degree, v_air_horiz, v_air_vert, pilot_weight=None):
+        self.__glider = current_glider
+        self.__v_air_horiz = v_air_horiz
+        self.__v_air_vert = v_air_vert
+        self.__ref_weight = current_glider['referenceWeight'].iloc[0]
+        self.__empty_weight = current_glider['emptyWeight'].iloc[0]
+        if (pilot_weight == None):
+            pilot_weight = self.__ref_weight - self.__empty_weight
 
-        self.__wFly = self.__wEmpty + pilotWeight
-        self.__wFactor = np.sqrt(self.__wFly/self.__wRef)
+        self.__wFly = self.__empty_weight + pilot_weight
+        self.__weight_factor = np.sqrt(self.__wFly/self.__ref_weight)
 
         self.__messages = ""
 
-        print(f'ref {self.__wRef}')
-        print(f'fly {self.__wFly}')
+#       self.loadJSON(currentGlider['polarFileName'].iloc[0])
+        self.load_CSV(current_glider['polarFileName'].iloc[0])
+        self.fit_polar(degree)
 
-#        self.loadJSON(currentGlider['polarFileName'].iloc[0])
-        self.loadCSV(currentGlider['polarFileName'].iloc[0])
-        self.fitPolar(degree)
-
-    def message(self):
+    def messages(self):
         return self.__messages
     
-    def get_wFactor(self):
-        return self.__wFactor
+    def get_weight_factor(self):
+        return self.__weight_factor
+    
+    def goal_function(self, v, mc):
+        return self.__goal_function(v, mc)
 
-    def fitPolar(self, degree):
+    def fit_polar(self, degree):
         self.__degree = degree
         
-        speed = self.__speedData.magnitude
-        sink = self.__sinkData.magnitude
+        speed = self.__speed_data.magnitude
+        sink = self.__sink_data.magnitude
 
-        self.__sinkPoly, (residuals, rank, sv, rcond) = Poly.fit(speed, sink, degree, full=True)
+        self.__sink_poly, (residuals, rank, sv, rcond) = Poly.fit(speed, sink, degree, full=True)
+        self.__sinkDeriv = self.__sink_poly.deriv()
 
         # Generate predicted y-values
-        sink_predicted = self.__sinkPoly(speed)
+        sink_predicted = self.__sink_poly(speed)
 
         # Calculate the R-value (Pearson correlation coefficient)
         r_value, p_value = stats.pearsonr(speed, sink_predicted)
@@ -58,7 +61,7 @@ class Polar:
 
         # The 'residuals' is the sum of squared errors
         chi_squared_value = residuals[0]
-        self.__messages += f"Chi-squared = {chi_squared_value:.3}\n"
+        self.__messages += f"&chi;<sup>2</sup> = {chi_squared_value:.3}\n"
 
         # To get the reduced chi-squared (chi-squared per degree of freedom)
         n_data_points = len(speed)
@@ -67,51 +70,55 @@ class Polar:
 
         if degrees_of_freedom > 0:
             reduced_chi_squared = chi_squared_value / degrees_of_freedom
-            self.__messages += f"Reduced Chi-squared = {reduced_chi_squared:.3}\n"
+            self.__messages += f"Reduced &chi;<sup>2</sup> = {reduced_chi_squared:.3}\n"
         else:
-            self.__messages += f"Reduced chi-squared is not defined when degrees of freedom is less than 1;  DOF = {degrees_of_freedom}.\n"
+            self.__messages += f"Reduced &chi;<sup>2</sup> is not defined when degrees of freedom is less than 1;  DOF = {degrees_of_freedom}.\n"
         
     def Sink(self, speed):
-        return self.__sinkPoly(speed)
+        return self.__sink_poly(speed)
 
     # mcTable has MacCready values in units of m/s
     def MacCready(self, mcTable):
-
         # Reichmann STF equation (Equation II) after moving left-hand-side to right-hand-side
         #  0 = Ws + Wm - Cl - (dWs/dV)V 
-        #  V  = glider's speed
+        #  V  = glider's airspeed speed
         #  Ws = sink rate from the glider's polar (negative)
         #  Wm = air mass movement = 0 for now
         #  Cl = climb rate (positive) = MacCready value
 
         # v = speedPoly = speed in m/s
         # mc = MacCready setting in m/s
-        # w = adjustment factor for actual takeoff weight
+        # wf = adjustment factor for actual takeoff weight
 
         # compute goalFunction = sink - speed * (derivative of sink)
-        sinkDeriv = self.__sinkPoly.deriv()
-        self.__goalFunction = lambda v, mc, w:  w*self.__sinkPoly(v/w) - (v/w) * w*sinkDeriv(v/w) - mc 
+        self.__sinkDeriv = self.__sink_poly.deriv()
+        self.__goal_function = lambda v, mc:  self.__weight_factor*self.__sink_poly(v/self.__weight_factor) - (v/self.__weight_factor) * self.__weight_factor*self.__sinkDeriv(v/self.__weight_factor) - mc -self.__v_air_vert.magnitude
 
-        root = np.zeros(len(mcTable))
-        Vavg = np.zeros(len(mcTable))
+        Vstf = np.zeros(len(mcTable))   # optimum speed-to-fly
+        Vavg = np.zeros(len(mcTable))   # net cross-country speed, taking thermalling time into account
+        LD = np.zeros(len(mcTable))     # L/D ratio at Vstf
+        goalValue = np.zeros(len(mcTable))
 
         # Guess 80 knots, but must express as m/s
         initial_guess = ureg('80.0 knots').to(ureg.mps).magnitude
 
         # For each MC value, find the speed at which "goalFunction" is equal to zero
+        wf = self.__weight_factor
         for i in range(len(mcTable)):
             mc = mcTable[i]
-            [solution, d, err, msg] = fsolve(self.__goalFunction, initial_guess, (mc.magnitude, self.__wFactor), full_output=True)
+            [solution, d, err, msg] = fsolve(self.__goal_function, initial_guess, (mc.magnitude), full_output=True, xtol=1e-5)
             if err == 1:
-                root[i] = solution[0]
+                v = solution[0]
+                Vstf[i] = v
+
                 # Reichmann: Vcruise = V * Cl / (Cl - Si); Cl = climb rate (positive); Si = sink rate (negative)
-                w = self.__wFactor
-                v = root[i]  #  v = STF / weight adjustment factor
                 if len(solution) > 1:
                     self.__messages += f'{i=}, {v=}, {len(solution)=}\n'
 
-                sink = w * self.__sinkPoly(v/w)
-                Vavg[i] = v * mc.magnitude / (mc.magnitude - sink)  
+                sink = wf * self.__sink_poly(v/wf)
+                LD[i] = -v / sink # negative sign because sink in negative by L/D is always express as positive
+                Vavg[i] = (v * mc.magnitude / (mc.magnitude - sink))
+                goalValue[i] = self.__goal_function(v, mc.magnitude,)
 
                 # Use this solution as the initial guess for the next v value 
                 initial_guess = v
@@ -120,8 +127,10 @@ class Polar:
                 self.__messages += f"Reason: {msg}\n"
                 
         dfMc = pd.DataFrame({'MC':  PA_(mcTable, ureg.mps),
-                            'STF':  PA_(root, ureg.mps),
-                            'Vavg': PA_(Vavg, ureg.mps)
+                            'STF':  PA_(Vstf, ureg.mps),
+                            'Vavg': PA_(Vavg, ureg.mps),
+                            'L/D': LD,
+                            'goalValue': goalValue
                             })
         return dfMc
     
@@ -167,13 +176,13 @@ class Polar:
     # Reads a polar from a CSV file created by WebPlotDigitizer at https://automeris.io/
     # x = first column  = speed in km per hour
     # y = second column = sink in m per second (all values should be negative)
-    def loadCSV(self, polarFileName):
-        print(f'polarFileName is "{polarFileName}"')
-        file_path = f"./datafiles/{polarFileName}"
-        print(f'file_path {file_path}')
+    def load_CSV(self, polar_file_name):
+        print(f'polarFileName is "{polar_file_name}"')
+        file_path = f"./datafiles/{polar_file_name}"
+        print(f'file_path is "{file_path}"')
 
         try:
-            df = pd.read_csv(file_path)
+            dfPolar = pd.read_csv(file_path)
         except FileNotFoundError:
             self.__messages += f"Error: The file '{file_path}' was not found.\n"
             return None
@@ -182,19 +191,19 @@ class Polar:
             self.__messages += f"An unexpected error occurred: {e}\n"
 
         # Convert speed from km/hr to m/s
-        self.__speedData = (df.iloc[:,0].to_numpy() * ureg.kph).to('mps')
+        self.__speed_data = (dfPolar.iloc[:,0].to_numpy() * ureg.kph).to('mps')
 
         # Sink is already in m/s
-        self.__sinkData = df.iloc[:,1].to_numpy() * ureg.mps
+        self.__sink_data = dfPolar.iloc[:,1].to_numpy() * ureg.mps
 
     def get_polar(self):
-        return self.__speedData, self.__sinkData
+        return self.__speed_data, self.__sink_data
     
     def getSpeedData(self):
-        return self.__speedData
+        return self.__speed_data
     
     def getSinkData(self):
-        return self.__sinkData
+        return self.__sink_data
     
 
     
