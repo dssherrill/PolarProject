@@ -42,8 +42,8 @@ METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
 US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs')}
 UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
-def polar_calc(current_glider, v_air_horiz, v_air_vert, pilot_weight, degree):
-    current_polar = polar.Polar(current_glider, degree, v_air_horiz, v_air_vert, pilot_weight)
+def polar_calc(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
+    current_polar = polar.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
     speed, sink = current_polar.get_polar()
 
     # Evaluate the polynomial for new points
@@ -209,11 +209,11 @@ app.layout = dbc.Container([
         dbc.Row([
             dbc.Col([
                 dbc.Row([
-                    dbc.Label("Horizontal speed"),
+                    dbc.Label("Horizontal speed", id='horizontal-speed-label'),
                     dcc.Input(id="airmass-horizontal-speed", type="number", placeholder="0"),
                 ], ), # width=2),
                 dbc.Row([
-                    dbc.Label("Vertical speed"),
+                    dbc.Label("Vertical speed", id='vertical-speed-label'),
                     dcc.Input(id="airmass-vertical-speed", type="number", placeholder="0"),
                 ], ), # width=2),
             ], width=3),
@@ -228,6 +228,14 @@ app.layout = dbc.Container([
             className="m-3"
         ),
         dbc.Col([
+            dbc.Row([
+                dbc.RadioItems(options=['Reichmann', 'Mine'],
+                               value='Mine',
+                               inline=False,
+                               id='radio-goal',
+                               )
+            ], className="mb-3"),
+
             dbc.Label("MacCready Value for Goal Function graph",html_for="ref-weight-input", className="w-2"),
             html.Br(),
             dcc.Input(id="maccready-input", type="number", placeholder="0"),
@@ -238,6 +246,8 @@ app.layout = dbc.Container([
 # Add controls to build the interaction
 @callback(
     Output(component_id='main-title', component_property='children'),
+    Output(component_id='horizontal-speed-label', component_property='children'),
+    Output(component_id='vertical-speed-label', component_property='children'),
     Output(component_id='statistics', component_property='children'),
     Output(component_id='ref-weight-input', component_property='placeholder'),
     Output(component_id='empty-weight-input', component_property='placeholder'),
@@ -261,6 +271,7 @@ app.layout = dbc.Container([
     Input(component_id='radio-units', component_property='value'),
     Input(component_id='maccready-input', component_property='value'),
     Input(component_id='pilot-weight-input', component_property='value'),
+    Input(component_id='radio-goal', component_property='value'),
     Input(component_id='airmass-horizontal-speed', component_property='value'),
     Input(component_id='airmass-vertical-speed', component_property='value'),    
     Input(component_id='toggle-switch-debug', component_property='value'),
@@ -268,7 +279,7 @@ app.layout = dbc.Container([
     State(component_id='empty-weight-input', component_property='value'),
 #    prevent_initial_call=True
 )
-def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_horiz, v_air_vert, show_debug_graphs, reference_weight, empty_weight):
+def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, reference_weight, empty_weight):
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
 
     global pilot_weight_kg
@@ -309,7 +320,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
     degree = max(degree, 2)
 
     # Get a polynomial fit to the polar curve data
-    df_fit, current_polar = polar_calc(current_glider, v_air_horiz, v_air_vert, pilot_weight_kg, degree)
+    df_fit, current_polar = polar_calc(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight_kg)
     weight_factor = current_polar.get_weight_factor()
 
     # Graph the polar data
@@ -458,6 +469,8 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
 
     print('update_graph return\n')
     return (glider_name, 
+            f"Horizontal speed ({speed_units.units:~P})",
+            f"Vertical speed ({speed_units.units:~P})",
             current_polar.messages(), 
             f"{reference_weight.to(selected_units['Weight']).magnitude:.1f}",
             f"{empty_weight.to(selected_units['Weight']).magnitude:.1f}",

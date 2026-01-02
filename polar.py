@@ -15,8 +15,9 @@ PA_ = pint_pandas.PintArray
 Q_ = ureg.Quantity
 
 class Polar:
-    def __init__(self, current_glider, degree, v_air_horiz, v_air_vert, pilot_weight=None):
+    def __init__(self, current_glider, degree, goal, v_air_horiz, v_air_vert, pilot_weight=None):
         self.__glider = current_glider
+        self.__goal_selection = goal
         self.__v_air_horiz = v_air_horiz
         self.__v_air_vert = v_air_vert
         self.__ref_weight = current_glider['referenceWeight'].iloc[0]
@@ -47,9 +48,15 @@ class Polar:
         return self.__weight_factor
     
     def goal_function(self, v, mc):
-#        return self.__goal_function(v, mc)
-        return self.goal_function_2(v, mc)
-    
+        g = self.__goal_selection
+        if g == 'Reichmann':
+            return self.goal_function_1(v, mc)
+        else:
+            if g == 'Mine':
+                return self.goal_function_2(v, mc)
+            else:
+                raise ValueError(f'Goal selection is {g} but must be "Reichmann" or "Mine".')
+            
     def sink(self, v):
         w = self.__weight_factor
         return w * self.__sink_poly(v/w) + self.__v_air_vert.magnitude
@@ -75,17 +82,15 @@ class Polar:
         # v = speed in m/s
         # mc = MacCready setting in m/s
         # wf = adjustment factor for actual takeoff weight
-
-        # self.sink(v) includes Wm
+        # self.sink(v) includes Wm = self.__v_air_vert
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
-        return s - v * s_deriv - mc
+        return s + - v * s_deriv - mc
 
-    # Reichmann solves for minimum time
+    # goal_function_1 uses Reichmann's equation for minimum time
     # goal_function_2 solves for maximum average speed
-    # This model gives better results when the airmass has vertical motion (during cruise) 
+    # This model seems to give different results when the airmass has vertical motion (during cruise) 
     def goal_function_2(self, v, mc):
-        x = self.__v_air_horiz.magnitude
         # f is a factor that defines the relative horizontal speed of the thermal
         # 1 means the thermal drifts at the same speed as the horizontal wind (in cruise)
         # 0 means the thermal rise vertically, with no horizontal motion
@@ -93,10 +98,13 @@ class Polar:
         # the rising thermal has significant mass and does not immediately accelerate
         # to the speed of the wind around it
         f = 1.0  
+
+        # self.sink(v) includes Wm = self.__v_air_vert
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
+        ax = self.__v_air_horiz.magnitude
 
-        return (mc + ((1-f)*x + v)*s_deriv - s) # /(mc - s)**2
+        return (mc + ((1-f)*ax + v)*s_deriv - s) # /(mc - s)**2
 
     # Fit the polar data to a polynomial
     # degree: the degree (order) of the polynomial to use
