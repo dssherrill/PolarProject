@@ -38,7 +38,7 @@ DEFAULT_POLYNOMIAL_DEGREE = 5
 weight_factor = 1.0
 
 # display options
-METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('mps'), 'Weight': ureg('kg')}
+METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
 US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs')}
 UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
@@ -63,11 +63,35 @@ dropdown_options = [
     for index, row in df_glider_info.iterrows()
 ]
 
+# Styles for Flexbox container and items
+container_style = {
+    "display": "flex",
+    "flex-wrap": "wrap", # Allows items to stack on small screens
+    # "gap": "20px",       # Space between items
+    # "padding": "20px"
+}
+
+# Responsive item: occupies half width on large screens, full width on small
+item_style = {
+    "flex": "0 0 450px", # grow=1, shrink=1, base_width=450px
+    "min-width": "300px" 
+}
+
+graph_style = {
+    "flex": "1 1 800px", # grow=1, shrink=1, base_width=450px
+    "min-width": "600px",
+    "min-height": "400px"
+}
+
+full_width_class = "d-flex w-100 justify-content-center bg-light p-3"
+
 # App layout
 app.layout = dbc.Container([
     dbc.Row([
-        html.Div(id='main-title', className="text-primary fs-3")
-    ]),
+        dbc.Col([
+            html.Div(id='main-title', className="text-primary fs-3",  )
+        ], width=12)
+    ], className=full_width_class),
     dbc.Row([
         # Input controls group
         dbc.Col([
@@ -115,7 +139,7 @@ app.layout = dbc.Container([
             #         # width={"size": 6, "offset": 3}
             #     )
             # ], className="mb-3"),
-        ], width=2),
+        ], ), # width=2),
         dbc.Col ([
             #--- Polynomial degree
             dbc.Row([
@@ -139,7 +163,15 @@ app.layout = dbc.Container([
             ], 
             #width={"size": 2, "offset": 1},
             className="mt-3 mb-3"),
-            ], width=5),
+            ],), # width=2),
+        dbc.Col([
+            dag.AgGrid(rowData=initial_data.to_dict('records'),
+                       columnDefs=[{"field": i, 'valueFormatter': {"function": "d3.format('.1f')(params.value)"},
+                                    'type': 'numericColumn'
+                                    } for i in initial_data.columns],
+                                    columnSize="autoSize",
+                                    id='mcAgGrid')
+        ], style=item_style), # width=3)
     ]),
 
     # dbc.Row([
@@ -164,35 +196,29 @@ app.layout = dbc.Container([
     #--- Graphs
     dbc.Row([
         dbc.Col([
-            dcc.Graph(figure={}, id='graph-polar')
-        ], width=5),
+            dcc.Graph(figure={}, id='graph-polar', style=graph_style)
+        ], ), # width=4),
 
         dbc.Col([
-            dcc.Graph(figure={}, id='graph-stf')
-        ], width=4),
+            dcc.Graph(figure={}, id='graph-stf', style=graph_style)
+        ], ), # width=4),
 
-        dbc.Col([
-            dag.AgGrid(rowData=initial_data.to_dict('records'),
-                       columnDefs=[{"field": i, 'valueFormatter': {"function": "d3.format('.1f')(params.value)"},
-                                    'type': 'numericColumn'
-                                    } for i in initial_data.columns],
-                                    columnSize="autoSize",
-                                    id='mcAgGrid')
-        ])
     ]),
     dbc.Row([
         html.Div('Airmass Movement', className="text-primary fs-3"),
         dbc.Row([
             dbc.Col([
-                dbc.Label("Horizontal speed"),
-                dcc.Input(id="airmass-horizontal-speed", type="number", placeholder="0"),
-            ], width=2),
-            dbc.Col([
-                dbc.Label("Vertical speed"),
-                dcc.Input(id="airmass-vertical-speed", type="number", placeholder="0"),
-            ], width=2),
-            ]), # width=),
-            ]),
+                dbc.Row([
+                    dbc.Label("Horizontal speed"),
+                    dcc.Input(id="airmass-horizontal-speed", type="number", placeholder="0"),
+                ], ), # width=2),
+                dbc.Row([
+                    dbc.Label("Vertical speed"),
+                    dcc.Input(id="airmass-vertical-speed", type="number", placeholder="0"),
+                ], ), # width=2),
+            ], width=3),
+        ])
+    ], className=full_width_class),
     dbc.Row([
         html.Div('Debug Options', className="text-primary fs-3 mt-5"),
         dbc.Switch(
@@ -206,8 +232,8 @@ app.layout = dbc.Container([
             html.Br(),
             dcc.Input(id="maccready-input", type="number", placeholder="0"),
         ], ), # width=2),
-    ]),
-], fluid=True)
+    ], style={"flex": "1 1 100%", }), # "margin-top": "20px"}),
+], style=container_style, fluid=True)
 
 # Add controls to build the interaction
 @callback(
@@ -220,6 +246,8 @@ app.layout = dbc.Container([
     Output(component_id='graph-polar', component_property='figure'),
     Output(component_id='graph-stf', component_property='figure'),
     Output(component_id='mcAgGrid', component_property='rowData'),
+    Output(component_id='mcAgGrid', component_property='columnDefs'),
+    Output(component_id='mcAgGrid', component_property='columnSize'),
     Output(component_id='poly-degree', component_property='value'),
     Output(component_id='ref-weight-label', component_property='children'),
     Output(component_id='empty-weight-label', component_property='children'),
@@ -272,9 +300,9 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
             pilot_weight_kg = (pilot_weight * weight_units).to('kg').magnitude
 
     # Set the units for unitless items from the user interface
-    maccready = maccready * sink_units.to('mps')
-    v_air_horiz = v_air_horiz * speed_units.to('mps')
-    v_air_vert = v_air_vert * speed_units.to('mps')
+    maccready = maccready * sink_units.to('m/s')
+    v_air_horiz = v_air_horiz * speed_units.to('m/s')
+    v_air_vert = v_air_vert * speed_units.to('m/s')
 
     # A linear model has no solutions for the MacCready equations, 
     # so the model must be a quadratic or higher order polynomial.
@@ -302,7 +330,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
         # Graph the residuals (difference between the data and the fit)
         speed_data = current_polar.getSpeedData().to(speed_units)
         sink_fit = current_polar.Sink(current_polar.getSpeedData().magnitude)
-        resid = current_polar.getSinkData().to(sink_units) - (sink_fit * ureg('mps')).to(sink_units)
+        resid = current_polar.getSinkData().to(sink_units) - (sink_fit * ureg('m/s')).to(sink_units)
         trace_residuals = go.Scatter(x=speed_data.magnitude,
                             y=resid.magnitude,
                             name=f"Residuals")
@@ -341,7 +369,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
 
     # Graph Speed-to-Fly vs. MC setting
     # MacCready values for table, zero to 6 knots, but must be coverted to m/s
-    mc_table =  (np.arange(start=0.0, stop=6.1, step=0.02) * ureg.knots).to('mps')
+    mc_table =  (np.arange(start=0.0, stop=6.1, step=0.02) * ureg.knots).to('m/s')
     df_mc = current_polar.MacCready(mc_table)
     v =df_fit['Speed'].pint.magnitude
 
@@ -394,7 +422,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
             x=0.5)
         )
 
-    if (sink_units == ureg('mps')):
+    if (sink_units == ureg('m/s')):
         # MacCready values for table, in m/s
         mc_table =  np.arange(start=0.0, stop=3.1, step=0.5) * ureg.mps
     else:
@@ -419,6 +447,15 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
 
     print(current_polar.messages())
 
+    # pd.DataFrame({'MC': [0], 'STF': [0], 'Vavg': [0], 'L/D': [0]})
+    new_column_defs = [
+        {"field": "MC", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"MC ({sink_units.units:~#})"},
+        {"field": "STF", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"STF ({speed_units.units:~P})"},
+        {"field": "Vavg", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"Vavg ({speed_units.units:~P})"},
+        {"field": "L/D", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": "L/D"},
+#        "columnSize": "autoSize",
+    ]
+
     print('update_graph return\n')
     return (glider_name, 
             current_polar.messages(), 
@@ -429,10 +466,12 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, v_air_hori
             polar_graph, 
             stf_graph, 
             df_mc.to_dict('records'), 
+            new_column_defs,
+            "sizeToFit",
             degree,
-            f"Reference weight ({selected_units['Weight'].units:~P}):",
-            f"Empty weight ({selected_units['Weight'].units:~P}):",
-            f"Pilot + Ballast weight ({selected_units['Weight'].units:~P}):",
+            f"Reference weight ({weight_units.units:~P}):",
+            f"Empty weight ({weight_units.units:~P}):",
+            f"Pilot + Ballast weight ({weight_units.units:~P}):",
     )
 
 # Run the app
