@@ -25,6 +25,7 @@ Q_ = ureg.Quantity
 
 # define global variable
 pilot_weight_kg = None
+df_out = None
 
 # Read list of available polars from a file
 df_glider_info = pd.read_json('datafiles/gliderInfo.json')
@@ -127,7 +128,7 @@ app.layout = dbc.Container([
 
             dbc.Row([
                 dbc.RadioItems(options=['Metric', 'US'],
-                            value='US',
+                            value='Metric',
                             inline=False,
                             id='radio-units',
                             )
@@ -164,14 +165,6 @@ app.layout = dbc.Container([
             #width={"size": 2, "offset": 1},
             className="mt-3 mb-3"),
             ],), # width=2),
-        dbc.Col([
-            dag.AgGrid(rowData=initial_data.to_dict('records'),
-                       columnDefs=[{"field": i, 'valueFormatter': {"function": "d3.format('.1f')(params.value)"},
-                                    'type': 'numericColumn'
-                                    } for i in initial_data.columns],
-                                    columnSize="autoSize",
-                                    id='mcAgGrid')
-        ], style=item_style), # width=3)
     ]),
 
     # dbc.Row([
@@ -202,19 +195,27 @@ app.layout = dbc.Container([
         dbc.Col([
             dcc.Graph(figure={}, id='graph-stf', style=graph_style)
         ], ), # width=4),
-
     ]),
+    dbc.Row([
+    dag.AgGrid(rowData=initial_data.to_dict('records'),
+                columnDefs=[{"field": i, 'valueFormatter': {"function": "d3.format('.1f')(params.value)"},
+                            'type': 'numericColumn'
+                            } for i in initial_data.columns],
+                            columnSize="autoSize",
+                            id='mcAgGrid')
+    ], style=item_style), # width=3)
+
     dbc.Row([
         html.Div('Airmass Movement', className="text-primary fs-3"),
         dbc.Row([
             dbc.Col([
                 dbc.Row([
                     dbc.Label("Horizontal speed", id='horizontal-speed-label'),
-                    dcc.Input(id="airmass-horizontal-speed", type="number", placeholder="0"),
+                    dcc.Input(id="airmass-horizontal-speed", type="number", placeholder="0", step="5.0"),
                 ], ), # width=2),
                 dbc.Row([
                     dbc.Label("Vertical speed", id='vertical-speed-label'),
-                    dcc.Input(id="airmass-vertical-speed", type="number", placeholder="0"),
+                    dcc.Input(id="airmass-vertical-speed", type="number", placeholder="0", min="-10", max="10", step="0.25"),
                 ], ), # width=2),
             ], width=3),
         ])
@@ -229,8 +230,8 @@ app.layout = dbc.Container([
         ),
         dbc.Col([
             dbc.Row([
-                dbc.RadioItems(options=['Reichmann', 'Mine'],
-                               value='Mine',
+                dbc.RadioItems(options=['Reichmann', 'Test'],
+                               value='Reichmann',
                                inline=False,
                                id='radio-goal',
                                )
@@ -283,7 +284,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
 
     global pilot_weight_kg
-
+    global df_out
     # handle display units option
     selected_units = UNIT_CHOICES[units]
     sink_units = selected_units['Sink']
@@ -386,6 +387,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     if show_debug_graphs:
         goal_function_values = current_polar.goal_function(v, maccready.magnitude)
+        goal_function_values[(goal_function_values >= 10) & (goal_function_values <= 10)] = np.nan
         trace_goal = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude,
                             y=goal_function_values,
                             name='Goal Function',)
@@ -398,8 +400,32 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
                         mode='lines')
     stf_graph.add_trace(trace_weight_adjusted, secondary_y=False,)
 
+    # Collect results
+    if (df_out is None):
+        df_out = pd.DataFrame(df_mc['MC'].pint.to('mps').pint.magnitude)
+        print('created df_out')
+    column_name =  f'Degree {degree}'
+    if column_name in df_out.columns:
+        df_out[column_name] = df_mc['STF'].pint.to('kph').pint.magnitude
+    else:
+        df_out = pd.concat([df_out, df_mc['STF'].pint.to('kph').pint.magnitude], axis=1)
+        df_out.rename(columns={'STF': column_name}, inplace=True)
+
+    print(df_out.columns)
+    # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
+
+    # Save results externally
+    # Open the file in write mode ('w') with newline=''
+    excel_outfile_name = f'{glider_name} stf.xlsx'
+    df_out.to_excel(excel_outfile_name, sheet_name='STF', index=False)
+
+    print(f'File "{excel_outfile_name}" created successfully')    
+
+    plot_max = max(df_mc['STF'].pint.to(speed_units).pint.magnitude)
+    y = df_mc['Vavg'].pint.to(speed_units).pint.magnitude
+    y[(y <= -50.0) | (y >= plot_max)] = np.nan
     trace_stf = go.Scatter(x = df_mc['MC'].pint.to(sink_units).pint.magnitude, 
-                        y = df_mc['Vavg'].pint.to(speed_units).pint.magnitude, 
+                        y = y,
                         name='Average Speed',
                         mode='lines')
     stf_graph.add_trace(trace_stf, secondary_y=False,)
@@ -460,10 +486,10 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     # pd.DataFrame({'MC': [0], 'STF': [0], 'Vavg': [0], 'L/D': [0]})
     new_column_defs = [
-        {"field": "MC", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"MC ({sink_units.units:~#})"},
-        {"field": "STF", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"STF ({speed_units.units:~P})"},
-        {"field": "Vavg", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": f"Vavg ({speed_units.units:~P})"},
-        {"field": "L/D", "type": "numericColumn", "valueFormatter": {"function": "d3.format('(.1f')(params.value)"}, "headerName": "L/D"},
+        {"field": "MC", "type": "numericColumn", "valueFormatter": {"function": "d3.format('.1f')(params.value)"}, "headerName": f"MC ({sink_units.units:~#})"},
+        {"field": "STF", "type": "numericColumn", "valueFormatter": {"function": "d3.format('.1f')(params.value)"}, "headerName": f"STF ({speed_units.units:~P})"},
+        {"field": "Vavg", "type": "numericColumn", "valueFormatter": {"function": "d3.format('.1f')(params.value)"}, "headerName": f"Vavg ({speed_units.units:~P})"},
+        {"field": "L/D", "type": "numericColumn", "valueFormatter": {"function": "d3.format('.1f')(params.value)"}, "headerName": "L/D"},
 #        "columnSize": "autoSize",
     ]
 

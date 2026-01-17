@@ -85,7 +85,7 @@ class Polar:
         # self.sink(v) includes Wm = self.__v_air_vert
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
-        return s + - v * s_deriv - mc
+        return s - v * s_deriv - mc
 
     # goal_function_1 uses Reichmann's equation for minimum time
     # goal_function_2 solves for maximum average speed
@@ -104,7 +104,7 @@ class Polar:
         s_deriv = self.sink_deriv(v)
         ax = self.__v_air_horiz.magnitude
 
-        return (mc + ((1-f)*ax + v)*s_deriv - s) # /(mc - s)**2
+        return (s - ((1-f)*ax + v)*s_deriv - mc) # / (mc - s)**2
 
     # Fit the polar data to a polynomial
     # degree: the degree (order) of the polynomial to use
@@ -113,6 +113,11 @@ class Polar:
         
         speed = self.__speed_data.magnitude
         sink = self.__sink_data.magnitude
+
+        # Do not fit polar data near stall speed
+        # Start the fit at the peak of the polar curve
+        # peak_index = np.argmax(sink)
+        # self.__sink_poly, (SSE, rank, sv, rcond) = Poly.fit(speed[peak_index:], sink[peak_index:], degree, full=True)
 
         self.__sink_poly, (SSE, rank, sv, rcond) = Poly.fit(speed, sink, degree, full=True)
         self.__sink_deriv_poly = self.__sink_poly.deriv()
