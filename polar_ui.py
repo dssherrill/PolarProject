@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 import dash
 from dash import dcc, html, Input, Output, State, callback
 import dash_bootstrap_components as dbc
@@ -294,6 +294,45 @@ app.layout = dbc.Container([
 #    prevent_initial_call=True
 )
 def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, write_excel_file, reference_weight, empty_weight):
+    """
+    Update the UI graphs, MacCready table, and related display values based on the current inputs.
+    
+    Updates the polar and speed-to-fly figures, computes MacCready table rows (converted to the selected units), optionally appends STF results to an Excel file, and returns all UI outputs required by the Dash callback.
+    
+    Parameters:
+        degree: Polynomial degree to fit the polar (treated as minimum 2 if lower or None).
+        glider_name: Name of the selected glider as present in the glider info dataset.
+        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
+        maccready: MacCready setting value in the currently selected sink units (0 if None).
+        pilot_weight: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
+        goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
+        v_air_horiz: Horizontal airmass movement in the selected speed units (0 if None).
+        v_air_vert: Vertical airmass movement in the selected speed units (0 if None).
+        show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
+        write_excel_file: If true, collect STF columns and save them to an Excel file named "<glider> stf.xlsx".
+        reference_weight: (UI state) reference weight value from the selected glider (not documented for API use).
+        empty_weight: (UI state) empty weight value from the selected glider (not documented for API use).
+    
+    Returns:
+        tuple: A 17-item tuple matching the Dash callback outputs in order:
+            - Displayed glider name (str)
+            - Horizontal speed label (str)
+            - Vertical speed label (str)
+            - Status/statistics messages from the polar model (str)
+            - Reference weight formatted for display (str)
+            - Empty weight formatted for display (str)
+            - Reference pilot weight formatted for display (str)
+            - Pilot weight input display value (str or None)
+            - Polar plot figure (plotly.graph_objs.Figure)
+            - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
+            - MacCready table row data as list of dicts
+            - Column definitions for the MacCready AG Grid (list[dict])
+            - Column sizing mode for the AG Grid (str)
+            - Effective polynomial degree used (int)
+            - Label string for the reference weight UI field (str)
+            - Label string for the empty weight UI field (str)
+            - Label string for the pilot+ballast weight UI field (str)
+    """
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
 
     global pilot_weight_kg
