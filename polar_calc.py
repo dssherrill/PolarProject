@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import json
 
 from numpy.polynomial import Polynomial as Poly
 from scipy.optimize import fsolve
@@ -31,7 +30,6 @@ class Polar:
 
         self.__messages = ""
 
-#       self.load_JSON(currentGlider['polarFileName'].iloc[0])
         self.load_CSV(current_glider['polarFileName'].iloc[0])
         self.fit_polar(degree)
 
@@ -184,41 +182,6 @@ class Polar:
     # Throughout this code, the conventional units are
     #  m/s for speed and 
     #  kg for weight
-
-    # Reads a polar from a JSON file created by WebPlotDigitizer at https://automeris.io/
-    # x = speed in km per hour
-    # y = sink in m per second (all values should be negative)
-    def load_JSON(self, polarFileName):
-        print(f'polarFileName is "{polarFileName}"')
-        file_path = f"./datafiles/{polarFileName}"
-        print(f'file_path {file_path}')
-
-        try:
-            with open(file_path, 'r') as f:
-                jsonData = json.load(f)
-        except FileNotFoundError:
-            self.__messages += f"Error: The file '{file_path}' was not found.\n"
-            return None
-        except json.JSONDecodeError as e:
-            self.__messages += f"Error decoding JSON: {e}\n"
-            return None
-
-        json_norm = pd.json_normalize(jsonData['datasetColl'][0]['data'])
-        json_polar_data = json_norm['value']
-        speed, sink = map(list, zip(*json_polar_data))
-
-        # Convert speed from km/hr to m/s
-        speed = speed * ureg.kph
-        speed.ito(ureg.mps)
-
-        # Sink is already in m/s
-        sink = sink * ureg.mps
-
-        self.__polar = pd.DataFrame({
-            'Speed':pd.Series(speed, dtype = 'pint[mps]'),
-            'Sink': pd.Series(sink, dtype = 'pint[mps]'),
-        })
-
 
     # Reads a polar from a CSV file created by WebPlotDigitizer at https://automeris.io/
     # x = first column  = speed in km per hour
