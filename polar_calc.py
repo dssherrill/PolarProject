@@ -200,7 +200,7 @@ class Polar:
         self.__messages += f"R<sup>2</sup> = {r_value**2:.5}\n"
 
         # Compute mean squared error (defensively extract SSE)
-        n_data_points = len(speed)
+        n_data_points = len(speed) - start_index
         if isinstance(SSE, (list, tuple, np.ndarray)) and len(SSE) > 0:
             SSE_val = SSE[0]
         else:
