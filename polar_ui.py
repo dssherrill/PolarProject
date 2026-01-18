@@ -1,4 +1,4 @@
-﻿import gunicorn
+﻿import os
 
 import numpy as np
 import dash
@@ -569,4 +569,10 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
 # Run the app
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 8050))
+    if port == 8050:
+        logger.info(f'Starting development server at http://localhost:{port}')
+        app.run(debug=True)
+    else:
+        logger.info(f'Starting production server on port {port}')
+        app.run(host='0.0.0.0', port=port, debug=True)
