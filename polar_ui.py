@@ -1,5 +1,4 @@
-﻿#!/usr/bin/env python3
-import numpy as np
+﻿import numpy as np
 import dash
 from dash import dcc, html, Input, Output, State, callback
 import dash_bootstrap_components as dbc
@@ -420,11 +419,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
             df_out = pd.DataFrame(df_mc['MC'].pint.to(sink_units).pint.magnitude)
             logger.debug('created df_out')
         column_name =  f'Degree {degree}'
-        if column_name in df_out.columns:
-            df_out[column_name] = df_mc['STF'].pint.to(speed_units).pint.magnitude
-        else:
-            df_out = pd.concat([df_out, df_mc['STF'].pint.to(speed_units).pint.magnitude], axis=1)
-            df_out.rename(columns={'STF': column_name}, inplace=True)
+        df_out[column_name] = df_mc['STF'].pint.to(speed_units).pint.magnitude
 
         logger.debug(df_out.columns)
         # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude

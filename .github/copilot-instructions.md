@@ -35,11 +35,11 @@ PolarProject calculates and visualizes glider performance based on **polar curve
 
 **[datafiles/\*.csv](datafiles/)** - WebPlotDigitizer exports  
 - Format: Speed (kph), Sink (m/s)
-- Created via https://automeris.io/WebPlotDigitizer
+- Created via [WebPlotDigitizer](https://automeris.io/WebPlotDigitizer)
 - Note: 1 CSV can represent multiple glider variants (e.g., ASK 21 K1 vs K2)
 
 ### Data Flow
-```
+```text
 gliderInfo.json → Glider metadata
     ↓
 polar_calc.Polar() → Load CSV → Fit polynomial → Solve STF

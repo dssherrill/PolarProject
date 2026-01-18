@@ -109,13 +109,7 @@ class Polar:
     # Fit the polar data to a polynomial
     # degree: the degree (order) of the polynomial to use
     def fit_polar(self, degree):
-        self.__degree = degree
-        # Ensure CSV data loaded successfully before fitting
-        if not hasattr(self, '_Polar__speed_data') or self.__speed_data is None:
-            raise ValueError('Polar speed data not loaded; cannot fit polar.')
-        if not hasattr(self, '_Polar__sink_data') or self.__sink_data is None:
-            raise ValueError('Polar sink data not loaded; cannot fit polar.')
-        
+        self.__degree = degree        
         speed = self.__speed_data.magnitude
         sink = self.__sink_data.magnitude
 
@@ -165,7 +159,6 @@ class Polar:
         initial_guess = ureg('50.0 knots').to(ureg.mps).magnitude
 
         # For each MC value, find the speed at which "goal_function" is equal to zero
-        wf = self.__weight_factor
         for i in range(len(mcTable)):
             mc = mcTable[i]
             [solution, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc.magnitude), full_output=True, xtol=1e-5)
@@ -231,10 +224,10 @@ class Polar:
         self.__sink_data = df_polar.iloc[:,1].to_numpy() * ureg.mps
 
         # Ensure CSV data loaded successfully before fitting
-        if not hasattr(self, '_Polar__speed_data') or self.__speed_data is None:
-            raise ValueError('Polar speed data not loaded; cannot fit polar.')
-        if not hasattr(self, '_Polar__sink_data') or self.__sink_data is None:
-            raise ValueError('Polar sink data not loaded; cannot fit polar.')
+        if self.__speed_data is None or len(self.__speed_data) == 0:
+            raise ValueError('Polar speed data not loaded or empty; cannot fit polar.')
+        if self.__sink_data is None or len(self.__sink_data) == 0:
+            raise ValueError('Polar sink data not loaded or empty; cannot fit polar.')
 
 
     def get_polar(self):
