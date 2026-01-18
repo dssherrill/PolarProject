@@ -1,4 +1,4 @@
-﻿#!C:\Users\david\AppData\Local\Programs\Python\Python312\python.exe
+﻿#!/usr/bin/env python3
 import numpy as np
 import dash
 from dash import dcc, html, Input, Output, State, callback
@@ -13,15 +13,17 @@ import dash_ag_grid as dag
 
 import polar_calc
 
-import dash_bootstrap_components as dbc
-
 import pint
 import pint_pandas
+
+import logging
 
 # Get access to the one-and-only UnitsRegistry instance
 from units import ureg
 PA_ = pint_pandas.PintArray
 Q_ = ureg.Quantity
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(name)s: %(message)s')
 
 # define global variable
 pilot_weight_kg = None
@@ -45,7 +47,7 @@ UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
 def load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
     current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
-    speed, sink = current_polar.get_polar()
+    speed, _ = current_polar.get_polar()
 
     # Evaluate the polynomial for new points
     speed = np.linspace(min(speed).magnitude, max(speed).magnitude, 100)
@@ -305,8 +307,8 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     # capture the pilot weight each time it changes
     if dash.ctx.triggered_id == 'pilot-weight-input':
-        print('pilot-weight-input clicked')
-        if pilot_weight == None:
+        logger.debug('pilot-weight-input clicked')
+        if pilot_weight is None:
             pilot_weight_kg = None
         else:
             pilot_weight_kg = (pilot_weight * weight_units).to('kg').magnitude
@@ -387,7 +389,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     if show_debug_graphs:
         goal_function_values = current_polar.goal_function(v, maccready.magnitude)
-        goal_function_values[(goal_function_values >= 10) & (goal_function_values <= 10)] = np.nan
+        goal_function_values[(goal_function_values >= 10) | (goal_function_values <= -10)] = np.nan
         trace_goal = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude,
                             y=goal_function_values,
                             name='Goal Function',)
@@ -403,7 +405,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     # Collect results
     if (df_out is None):
         df_out = pd.DataFrame(df_mc['MC'].pint.to('mps').pint.magnitude)
-        print('created df_out')
+        logger.debug('created df_out')
     column_name =  f'Degree {degree}'
     if column_name in df_out.columns:
         df_out[column_name] = df_mc['STF'].pint.to('kph').pint.magnitude
@@ -411,7 +413,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
         df_out = pd.concat([df_out, df_mc['STF'].pint.to('kph').pint.magnitude], axis=1)
         df_out.rename(columns={'STF': column_name}, inplace=True)
 
-    print(df_out.columns)
+    logger.debug(df_out.columns)
     # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
 
     # Save results externally
@@ -419,7 +421,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     excel_outfile_name = f'{glider_name} stf.xlsx'
     df_out.to_excel(excel_outfile_name, sheet_name='STF', index=False)
 
-    print(f'File "{excel_outfile_name}" created successfully')    
+    logger.info(f'File "{excel_outfile_name}" created successfully')    
 
     plot_max = max(df_mc['STF'].pint.to(speed_units).pint.magnitude)
     y = df_mc['Vavg'].pint.to(speed_units).pint.magnitude
@@ -441,7 +443,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
         xaxis_title=f"MacCready Setting ({sink_units.units:~P})",
         yaxis_title=f"Speed ({speed_units.units:~P})",
         title={
-        'text': f"MacCready Speed-to-Fly",
+        'text': 'MacCready Speed-to-Fly',
         'y':0.9,
         'x':0.5,
         'xanchor': 'center',
@@ -477,12 +479,12 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     empty_weight = current_glider['emptyWeight'].iloc[0] * ureg('kg')
     reference_pilot_weight = reference_weight - empty_weight 
 
-    if pilot_weight_kg == None:
+    if pilot_weight_kg is None:
         pilot_weight_out = None
     else:
         pilot_weight_out = f"{(pilot_weight_kg * ureg('kg')).to(selected_units['Weight']).magnitude:.1f}"
 
-    print(current_polar.messages())
+    logger.info(current_polar.messages())
 
     # pd.DataFrame({'MC': [0], 'STF': [0], 'Vavg': [0], 'L/D': [0]})
     new_column_defs = [
@@ -493,7 +495,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 #        "columnSize": "autoSize",
     ]
 
-    print('update_graph return\n')
+    logger.debug('update_graph return\n')
     return (glider_name, 
             f"Horizontal speed ({speed_units.units:~P})",
             f"Vertical speed ({speed_units.units:~P})",
