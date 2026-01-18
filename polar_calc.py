@@ -195,12 +195,12 @@ class Polar:
         sink_predicted = self.__sink_poly(speed)
 
         # Calculate the R-value (Pearson correlation coefficient)
-        r_value, _p_value = stats.pearsonr(speed, sink_predicted)
+        r_value, _p_value = stats.pearsonr(sink[start_index:], sink_predicted[start_index:])
 
-        self.__messages += f"R<sup>2</sup> = {r_value**2:.3}\n"
+        self.__messages += f"R<sup>2</sup> = {r_value**2:.5}\n"
 
         # Compute mean squared error (defensively extract SSE)
-        n_data_points = len(speed)
+        n_data_points = len(speed) - start_index
         if isinstance(SSE, (list, tuple, np.ndarray)) and len(SSE) > 0:
             SSE_val = SSE[0]
         else:
