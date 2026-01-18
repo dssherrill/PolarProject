@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 
 import dash_ag_grid as dag
 
-import polar
+import polar_calc
 
 import dash_bootstrap_components as dbc
 
@@ -43,8 +43,8 @@ METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
 US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs')}
 UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
-def polar_calc(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
-    current_polar = polar.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
+def load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
+    current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
     speed, sink = current_polar.get_polar()
 
     # Evaluate the polynomial for new points
@@ -321,7 +321,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     degree = max(degree, 2)
 
     # Get a polynomial fit to the polar curve data
-    df_fit, current_polar = polar_calc(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight_kg)
+    df_fit, current_polar = load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight_kg)
     weight_factor = current_polar.get_weight_factor()
 
     # Graph the polar data
