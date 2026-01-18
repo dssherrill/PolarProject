@@ -33,6 +33,7 @@ class Polar:
         self.__messages = ""
 
         self.load_CSV(current_glider['polarFileName'].iloc[0])
+
         self.fit_polar(degree)
 
     def messages(self):
@@ -51,10 +52,10 @@ class Polar:
         g = self.__goal_selection
         if g == 'Reichmann':
             return self.goal_function_1(v, mc)
-        elif g == 'Mine':
+        elif g == 'Test':
             return self.goal_function_2(v, mc)
         else:
-            raise ValueError(f'Goal selection is {g} but must be "Reichmann" or "Mine".')
+            raise ValueError(f'Goal selection is {g} but must be "Reichmann" or "Test".')
             
     def sink(self, v):
         w = self.__weight_factor
@@ -103,7 +104,7 @@ class Polar:
         s_deriv = self.sink_deriv(v)
         ax = self.__v_air_horiz.magnitude
 
-        return (s - ((1-f)*ax + v)*s_deriv - mc) # / (mc - s)**2
+        return (s - ((1-f)*ax + v)*s_deriv - mc) / (mc - s)**2
 
     # Fit the polar data to a polynomial
     # degree: the degree (order) of the polynomial to use
@@ -118,12 +119,15 @@ class Polar:
         speed = self.__speed_data.magnitude
         sink = self.__sink_data.magnitude
 
-        # Do not fit polar data near stall speed
-        # Start the fit at the peak of the polar curve
-        # peak_index = np.argmax(sink)
-        # self.__sink_poly, (SSE, rank, sv, rcond) = Poly.fit(speed[peak_index:], sink[peak_index:], degree, full=True)
+        # Low-order fits should ignore polar data at speeds below minimum sink
+        # because the model cannot follow the curvature near stall speed
+        min_sink_index = np.argmax(sink)
+        if degree == 2:
+            start_index = min_sink_index
+        else:
+            start_index = 0
 
-        self.__sink_poly, (SSE, _rank, _sv, _rcond) = Poly.fit(speed, sink, degree, full=True)
+        self.__sink_poly, (SSE, _rank, _sv, _rcond) = Poly.fit(speed[start_index:], sink[start_index:], degree, full=True)
         self.__sink_deriv_poly = self.__sink_poly.deriv()
 
         # Generate predicted y-values
@@ -157,8 +161,8 @@ class Polar:
         LD = np.zeros(len(mcTable))     # L/D ratio at Vstf
         solver_result = np.zeros(len(mcTable))
 
-        # Guess 80 knots, but must express as m/s
-        initial_guess = ureg('80.0 knots').to(ureg.mps).magnitude
+        # Guess 50 knots, but must express as m/s
+        initial_guess = ureg('50.0 knots').to(ureg.mps).magnitude
 
         # For each MC value, find the speed at which "goal_function" is equal to zero
         wf = self.__weight_factor
@@ -225,6 +229,13 @@ class Polar:
 
         # Sink is already in m/s
         self.__sink_data = df_polar.iloc[:,1].to_numpy() * ureg.mps
+
+        # Ensure CSV data loaded successfully before fitting
+        if not hasattr(self, '_Polar__speed_data') or self.__speed_data is None:
+            raise ValueError('Polar speed data not loaded; cannot fit polar.')
+        if not hasattr(self, '_Polar__sink_data') or self.__sink_data is None:
+            raise ValueError('Polar sink data not loaded; cannot fit polar.')
+
 
     def get_polar(self):
         return self.__speed_data, self.__sink_data

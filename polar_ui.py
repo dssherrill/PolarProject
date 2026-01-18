@@ -228,10 +228,21 @@ app.layout = dbc.Container([
             id="toggle-switch-debug",
             label="Include debug graphs",
             value=False,  # Initial state
-            className="m-3"
+            className="ms-3"
         ),
+    # ]),
+
+    # dbc.Row([
+        dbc.Switch(
+            id="toggle-switch-dump",
+            label="Dump file",
+            value=False,  # Initial state
+            className="ms-3"
+        ),
+        
         dbc.Col([
             dbc.Row([
+            html.Div('Solution', className="text-primary fs-3 mt-5"),
                 dbc.RadioItems(options=['Reichmann', 'Test'],
                                value='Reichmann',
                                inline=False,
@@ -278,11 +289,12 @@ app.layout = dbc.Container([
     Input(component_id='airmass-horizontal-speed', component_property='value'),
     Input(component_id='airmass-vertical-speed', component_property='value'),    
     Input(component_id='toggle-switch-debug', component_property='value'),
+    Input(component_id='toggle-switch-dump', component_property='value'),
     State(component_id='ref-weight-input', component_property='value'),
     State(component_id='empty-weight-input', component_property='value'),
 #    prevent_initial_call=True
 )
-def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, reference_weight, empty_weight):
+def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, write_excel_file, reference_weight, empty_weight):
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
 
     global pilot_weight_kg
@@ -402,26 +414,30 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
                         mode='lines')
     stf_graph.add_trace(trace_weight_adjusted, secondary_y=False,)
 
-    # Collect results
-    if (df_out is None):
-        df_out = pd.DataFrame(df_mc['MC'].pint.to('mps').pint.magnitude)
-        logger.debug('created df_out')
-    column_name =  f'Degree {degree}'
-    if column_name in df_out.columns:
-        df_out[column_name] = df_mc['STF'].pint.to('kph').pint.magnitude
+    # Collect results if Excel output requested
+    if write_excel_file:
+        if (df_out is None):
+            df_out = pd.DataFrame(df_mc['MC'].pint.to(sink_units).pint.magnitude)
+            logger.debug('created df_out')
+        column_name =  f'Degree {degree}'
+        if column_name in df_out.columns:
+            df_out[column_name] = df_mc['STF'].pint.to(speed_units).pint.magnitude
+        else:
+            df_out = pd.concat([df_out, df_mc['STF'].pint.to(speed_units).pint.magnitude], axis=1)
+            df_out.rename(columns={'STF': column_name}, inplace=True)
+
+        logger.debug(df_out.columns)
+        # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
+
+        # Save results externally
+        # Open the file in write mode ('w') with newline=''
+        excel_outfile_name = f'{glider_name} stf.xlsx'
+        df_out.to_excel(excel_outfile_name, sheet_name='STF', index=False)
+
+        logger.info(f'File "{excel_outfile_name}" created successfully')
     else:
-        df_out = pd.concat([df_out, df_mc['STF'].pint.to('kph').pint.magnitude], axis=1)
-        df_out.rename(columns={'STF': column_name}, inplace=True)
-
-    logger.debug(df_out.columns)
-    # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
-
-    # Save results externally
-    # Open the file in write mode ('w') with newline=''
-    excel_outfile_name = f'{glider_name} stf.xlsx'
-    df_out.to_excel(excel_outfile_name, sheet_name='STF', index=False)
-
-    logger.info(f'File "{excel_outfile_name}" created successfully')    
+        # Delete any accumulated data
+        df_out = None
 
     plot_max = max(df_mc['STF'].pint.to(speed_units).pint.magnitude)
     y = df_mc['Vavg'].pint.to(speed_units).pint.magnitude
@@ -474,7 +490,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     df_mc['STF'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
     df_mc['Vavg'] = df_mc['Vavg'].pint.to(speed_units).pint.magnitude
 
-    # These are all in kg but stored at floats without units    
+    # These are all in kg but stored as floats without units    
     reference_weight = current_glider['referenceWeight'].iloc[0] * ureg('kg')
     empty_weight = current_glider['emptyWeight'].iloc[0] * ureg('kg')
     reference_pilot_weight = reference_weight - empty_weight 
