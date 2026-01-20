@@ -49,9 +49,16 @@ class Polar:
         else:
             self.__weight_fly = self.__empty_weight + pilot_weight
 
-        self.__weight_factor = np.sqrt(self.__weight_fly/self.__ref_weight)
-
         self.__messages = ""
+
+        # Weight factor used to scale the polar sink rates
+        if self.__ref_weight == 0:
+            msg = "Reference weight is zero; forcing weight factor to 1.0"
+            np.log.error(msg)
+            self.__messages += msg + "\n"
+            self.__weight_factor = 1.0
+        else:
+            self.__weight_factor = np.sqrt(self.__weight_fly/self.__ref_weight)
 
         self.load_CSV(current_glider['polarFileName'].iloc[0])
 
@@ -130,7 +137,6 @@ class Polar:
 
         # v = speed in m/s
         # mc = MacCready setting in m/s
-        # wf = adjustment factor for actual takeoff weight
         # self.sink(v) includes Wm = self.__v_air_vert
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
