@@ -54,7 +54,7 @@ class Polar:
         # Weight factor used to scale the polar sink rates
         if self.__ref_weight == 0:
             msg = "Reference weight is zero; forcing weight factor to 1.0"
-            np.log.error(msg)
+            logger.error(msg)
             self.__messages += msg + "\n"
             self.__weight_factor = 1.0
         else:
