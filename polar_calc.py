@@ -121,6 +121,8 @@ class Polar:
         w = self.__weight_factor
         return self.__sink_deriv_poly(v/w)
 
+    # Average cross-country speed accounting for thermalling time
+    # using Eq (2) from the included document "MacCready Speed to Fly Theory.pdf"
     def v_avg(self, v, mc):
         x = self.__v_air_horiz.magnitude
         f = 1.0
