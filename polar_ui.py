@@ -336,6 +336,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
             - Label string for the pilot+ballast weight UI field (str)
     """
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
+    logger.info(f'glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}')
 
     global pilot_weight_kg
     global df_out
@@ -550,7 +551,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     logger.debug('update_graph return\n')
     return (glider_name, 
             f"Horizontal speed ({speed_units.units:~P})",
-            f"Vertical speed ({speed_units.units:~P})",
+            f"Vertical speed ({sink_units.units:~P})",
             current_polar.messages(), 
             f"{reference_weight.to(selected_units['Weight']).magnitude:.1f}",
             f"{empty_weight.to(selected_units['Weight']).magnitude:.1f}",
