@@ -39,7 +39,6 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # polynomical fit degree (order)
 DEFAULT_POLYNOMIAL_DEGREE = 5
-weight_factor = 1.0
 
 # display options
 METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
