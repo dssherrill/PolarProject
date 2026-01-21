@@ -90,6 +90,7 @@ full_width_class = "d-flex w-100 justify-content-center bg-light p-3"
 
 # App layout
 app.layout = dbc.Container([
+    dcc.Store(id='user-data-store', storage_type='localStorage'),
     dbc.Row([
         dbc.Col([
             html.Div(id='main-title', className="text-primary fs-3",  )
@@ -104,7 +105,8 @@ app.layout = dbc.Container([
                     id="glider-dropdown",
                     options=dropdown_options,
                     value='ASW 28', # dropdown_options[0]['value'] if dropdown_options else None, # Set a default value if options exist
-                    placeholder="Select a glider...",
+                    placeholder="Select a glider...", 
+                    persistence=True, persistence_type='local'
                 ),
                 html.Div(id="output-container"),
                             
@@ -133,6 +135,7 @@ app.layout = dbc.Container([
                             value='Metric',
                             inline=False,
                             id='radio-units',
+                            persistence=True, persistence_type='local',
                             )
             ], className="mb-3"),
 
@@ -259,9 +262,45 @@ app.layout = dbc.Container([
 
 # Add controls to build the interaction
 @callback(
-    Output(component_id='main-title', component_property='children'),
+    Output(component_id='ref-weight-label', component_property='children'),
+    Output(component_id='empty-weight-label', component_property='children'),
+    Output(component_id='pilot-weight-label', component_property='children'),
     Output(component_id='horizontal-speed-label', component_property='children'),
     Output(component_id='vertical-speed-label', component_property='children'),
+    Output(component_id='pilot-weight-input', component_property='value'),
+    Input(component_id='radio-units', component_property='value'),
+    Input(component_id='pilot-weight-input', component_property='value'),
+    prevent_initial_call=True
+)
+def process_unit_change(units, pilot_weight):
+    global pilot_weight_kg
+    """
+    Update labels based on the selected unit system.
+    
+    Parameters:
+        units: Unit system key ('Metric' or 'US') determining weight display units.
+        pilot_weight: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
+    """
+    selected_units = UNIT_CHOICES[units]
+    weight_units = selected_units['Weight']
+
+    # capture the pilot weight each time it changes
+    if dash.ctx.triggered_id == 'pilot-weight-input':
+        logger.debug('pilot-weight-input clicked')
+        if pilot_weight is None:
+            pilot_weight_kg = None
+        else:
+            pilot_weight_kg = (pilot_weight * weight_units).to('kg').magnitude
+
+    return (f"Reference weight ({weight_units.units:~P}):",
+            f"Empty weight ({weight_units.units:~P}):",
+            f"Pilot + Ballast weight ({weight_units.units:~P}):",
+            f"Horizontal speed ({selected_units['Speed'].units:~P}):",
+            f"Vertical speed ({selected_units['Sink'].units:~P}):", 
+            pilot_weight_kg if pilot_weight_kg is None else f"{(pilot_weight_kg * ureg('kg')).to(weight_units).magnitude:.1f}"
+    )
+@callback(
+    Output(component_id='main-title', component_property='children'),
     Output(component_id='statistics', component_property='children'),
     Output(component_id='ref-weight-input', component_property='placeholder'),
     Output(component_id='empty-weight-input', component_property='placeholder'),
@@ -273,28 +312,24 @@ app.layout = dbc.Container([
     Output(component_id='mcAgGrid', component_property='columnDefs'),
     Output(component_id='mcAgGrid', component_property='columnSize'),
     Output(component_id='poly-degree', component_property='value'),
-    Output(component_id='ref-weight-label', component_property='children'),
-    Output(component_id='empty-weight-label', component_property='children'),
-    Output(component_id='pilot-weight-label', component_property='children'),
     
-
     # Input('pilot-weight-input', 'n-submit'),
     # Input('submit-button', 'n_clicks'),
     Input(component_id='poly-degree', component_property='value'),
     Input(component_id='glider-dropdown', component_property='value'),
-    Input(component_id='radio-units', component_property='value'),
     Input(component_id='maccready-input', component_property='value'),
-    Input(component_id='pilot-weight-input', component_property='value'),
     Input(component_id='radio-goal', component_property='value'),
     Input(component_id='airmass-horizontal-speed', component_property='value'),
     Input(component_id='airmass-vertical-speed', component_property='value'),    
     Input(component_id='toggle-switch-debug', component_property='value'),
     Input(component_id='toggle-switch-dump', component_property='value'),
+    State(component_id='radio-units', component_property='value'),
     State(component_id='ref-weight-input', component_property='value'),
     State(component_id='empty-weight-input', component_property='value'),
+    State(component_id='pilot-weight-input', component_property='value'),
 #    prevent_initial_call=True
 )
-def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, write_excel_file, reference_weight, empty_weight):
+def update_graph(degree, glider_name, maccready, goal_function, v_air_horiz, v_air_vert, show_debug_graphs, write_excel_file, units, reference_weight, empty_weight, pilot_weight):
     """
     Update the UI graphs, MacCready table, and related display values based on the current inputs.
     
@@ -305,7 +340,6 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
         glider_name: Name of the selected glider as present in the glider info dataset.
         units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
         maccready: MacCready setting value in the currently selected sink units (0 if None).
-        pilot_weight: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
         goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
         v_air_horiz: Horizontal airmass movement in the selected speed units (0 if None).
         v_air_vert: Vertical airmass movement in the selected speed units (0 if None).
@@ -317,8 +351,6 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
     Returns:
         tuple: A 17-item tuple matching the Dash callback outputs in order:
             - Displayed glider name (str)
-            - Horizontal speed label (str)
-            - Vertical speed label (str)
             - Status/statistics messages from the polar model (str)
             - Reference weight formatted for display (str)
             - Empty weight formatted for display (str)
@@ -330,9 +362,6 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
             - Column definitions for the MacCready AG Grid (list[dict])
             - Column sizing mode for the AG Grid (str)
             - Effective polynomial degree used (int)
-            - Label string for the reference weight UI field (str)
-            - Label string for the empty weight UI field (str)
-            - Label string for the pilot+ballast weight UI field (str)
     """
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
     logger.info(f'glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}')
@@ -356,14 +385,6 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     if v_air_vert is None:
         v_air_vert = 0.0
-
-    # capture the pilot weight each time it changes
-    if dash.ctx.triggered_id == 'pilot-weight-input':
-        logger.debug('pilot-weight-input clicked')
-        if pilot_weight is None:
-            pilot_weight_kg = None
-        else:
-            pilot_weight_kg = (pilot_weight * weight_units).to('kg').magnitude
 
     # Set the units for unitless items from the user interface
     maccready = maccready * sink_units.to('m/s')
@@ -549,8 +570,6 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
 
     logger.debug('update_graph return\n')
     return (glider_name, 
-            f"Horizontal speed ({speed_units.units:~P})",
-            f"Vertical speed ({sink_units.units:~P})",
             current_polar.messages(), 
             f"{reference_weight.to(selected_units['Weight']).magnitude:.1f}",
             f"{empty_weight.to(selected_units['Weight']).magnitude:.1f}",
@@ -562,10 +581,7 @@ def update_graph(degree, glider_name, units, maccready, pilot_weight, goal_funct
             new_column_defs,
             "sizeToFit",
             degree,
-            f"Reference weight ({weight_units.units:~P}):",
-            f"Empty weight ({weight_units.units:~P}):",
-            f"Pilot + Ballast weight ({weight_units.units:~P}):",
-    )
+            )
 
 # Run the app
 if __name__ == '__main__':
