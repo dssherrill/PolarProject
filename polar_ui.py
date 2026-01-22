@@ -277,16 +277,16 @@ app.layout = dbc.Container([
     Output(component_id='airmass-horizontal-speed', component_property='value'),
     Output(component_id='airmass-vertical-speed', component_property='value'),
     Output('user-data-store', 'data'),
-    Input(component_id='user-data-store', component_property='data'),
     Input(component_id='radio-units', component_property='value'),
     Input(component_id='glider-dropdown', component_property='value'),
     Input(component_id='pilot-weight-input', component_property='value'),
     Input(component_id='airmass-horizontal-speed', component_property='value'),
     Input(component_id='airmass-vertical-speed', component_property='value'),    
+    State(component_id='user-data-store', component_property='data'),
 
 #    prevent_initial_call=True    
 )
-def process_unit_change(data, units, glider_name, pilot_weight_in, v_air_horiz_in, v_air_vert_in):
+def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_air_vert_in, data):
     """
     Update labels based on the selected unit system.
     
