@@ -91,7 +91,6 @@ full_width_class = "d-flex w-100 justify-content-center bg-light p-3"
 # App layout
 app.layout = dbc.Container([
     dcc.Store(id='user-data-store', storage_type='localStorage'),
-    dcc.Store(id='user-data-sequence', storage_type='localStorage'),
     dbc.Row([
         dbc.Col([
             html.Div(id='main-title', className="text-primary fs-3",  )
@@ -262,68 +261,9 @@ app.layout = dbc.Container([
     ], style={"flex": "1 1 100%", }), # "margin-top": "20px"}),
 ], style=container_style, fluid=True)
 
-# Add controls to build the interaction
-@callback(
-    Output('user-data-store', 'data'),
-    Input(component_id='pilot-weight-input', component_property='value'),
-    Input(component_id='airmass-horizontal-speed', component_property='value'),
-    Input(component_id='airmass-vertical-speed', component_property='value'),    
-    State(component_id='radio-units', component_property='value'),
-    State('user-data-store', 'data'),
-
-#    prevent_initial_call=True    
-)
-def process_value_change(pilot_weight_in, v_air_horiz_in, v_air_vert_in, units, data):
-    """
-    Update labels based on the selected unit system.
-    
-    Parameters:
-        units: Unit system key ('Metric' or 'US') determining weight display units.
-        pilot_weight_in: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
-    """
-    logger.debug(f'process_value_change called _production_mode={_production_mode}')
-
-    pilot_weight = data['pilot_weight'] if data else None
-    v_air_horiz = data['v_air_horiz'] if data else None
-    v_air_vert = data['v_air_vert'] if data else None
-
-    print(f'{pilot_weight_in=}, {v_air_horiz_in=}, {v_air_vert_in=}')
-    
-    selected_units = UNIT_CHOICES[units]
-    weight_units = selected_units['Weight']
-    speed_units = selected_units['Speed']
-    sink_units = selected_units['Sink']
-
-    set_props('toggle-switch-dump', {'disabled': _production_mode})
-
-    # capture the pilot weight each time it changes
-    if dash.ctx.triggered_id == 'pilot-weight-input':
-        logger.debug('pilot-weight-input clicked')
-        if pilot_weight_in is None:
-            pilot_weight = None
-        else:
-            pilot_weight = (pilot_weight_in * weight_units).to('kg').magnitude
-
-    # capture the horizontal airmass speed each time it changes
-    if dash.ctx.triggered_id == 'airmass-horizontal-speed':
-        logger.debug('airmass-horizontal-speed clicked')
-        if v_air_horiz_in is None:
-            v_air_horiz = None
-        else:
-            v_air_horiz = (v_air_horiz_in * speed_units).to('m/s').magnitude
-
-    # capture the vertical airmass speed each time it changes
-    if dash.ctx.triggered_id == 'airmass-vertical-speed':
-        logger.debug('airmass-vertical-speed clicked')
-        if v_air_vert_in is None:
-            v_air_vert = None
-        else:
-            v_air_vert = (v_air_vert_in * sink_units).to('m/s').magnitude
-
-
-    return {'pilot_weight': pilot_weight, 'v_air_horiz': v_air_horiz, 'v_air_vert': v_air_vert}
 ##################################################################
-# Add controls to build the interaction
+# Handle unit system changes and update labels accordingly
+# Also capture pilot weight and airmass speeds into the data store
 @callback(
     Output(component_id='ref-weight-label', component_property='children'),
     Output(component_id='empty-weight-label', component_property='children'),
@@ -363,8 +303,6 @@ def process_unit_change(data, units, glider_name, pilot_weight_in, v_air_horiz_i
     pilot_weight = data['pilot_weight'] if data else None
     v_air_horiz = data['v_air_horiz'] if data else None
     v_air_vert = data['v_air_vert'] if data else None
-
-    print(f'process_unit_change {pilot_weight=}, {v_air_horiz=}, {v_air_vert=}')
     
     selected_units = UNIT_CHOICES[units]
     weight_units = selected_units['Weight']
@@ -420,20 +358,6 @@ def process_unit_change(data, units, glider_name, pilot_weight_in, v_air_horiz_i
             {'pilot_weight': pilot_weight, 'v_air_horiz': v_air_horiz, 'v_air_vert': v_air_vert}
            )
 
-"""
-    Output(component_id='ref-weight-label', component_property='children'),
-    Output(component_id='empty-weight-label', component_property='children'),
-    Output(component_id='pilot-weight-label', component_property='children'),
-    Output(component_id='horizontal-speed-label', component_property='children'),
-    Output(component_id='vertical-speed-label', component_property='children'),
-    Output(component_id='ref-weight-input', component_property='placeholder'),
-    Output(component_id='empty-weight-input', component_property='placeholder'),
-    Output(component_id='pilot-weight-input', component_property='placeholder'),
-    Output(component_id='pilot-weight-input', component_property='value'),
-    Output(component_id='airmass-horizontal-speed', component_property='value'),
-    Output(component_id='airmass-vertical-speed', component_property='value'),
-    Output('user-data-store', 'data'),
-"""
 ##################################################################
 
 @callback(
@@ -445,21 +369,15 @@ def process_unit_change(data, units, glider_name, pilot_weight_in, v_air_horiz_i
     Output(component_id='mcAgGrid', component_property='columnDefs'),
     Output(component_id='mcAgGrid', component_property='columnSize'),
     Output(component_id='poly-degree', component_property='value'),
-    
-    # Input('pilot-weight-input', 'n-submit'),
-    # Input('submit-button', 'n_clicks'),
+
     Input('user-data-store', 'data'),
     Input(component_id='poly-degree', component_property='value'),
     Input(component_id='glider-dropdown', component_property='value'),
     Input(component_id='maccready-input', component_property='value'),
     Input(component_id='radio-goal', component_property='value'),
-#    Input(component_id='airmass-horizontal-speed', component_property='value'),
-#    Input(component_id='airmass-vertical-speed', component_property='value'),    
     Input(component_id='toggle-switch-debug', component_property='value'),
     Input(component_id='toggle-switch-dump', component_property='value'),
     State(component_id='radio-units', component_property='value'),
-#    State(component_id='pilot-weight-input', component_property='value'),
-#    prevent_initial_call=True
 )
 def update_graph(data, degree, glider_name, maccready, goal_function, show_debug_graphs, write_excel_file, units,):
     """
@@ -471,23 +389,16 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
         data: Stored user data including pilot weight and airmass speeds.
         degree: Polynomial degree to fit the polar (treated as minimum 2 if lower or None).
         glider_name: Name of the selected glider as present in the glider info dataset.
-        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
         maccready: MacCready setting value in the currently selected sink units (0 if None).
         goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
-        v_air_horiz: Horizontal airmass movement in the selected speed units (0 if None).
-        v_air_vert: Vertical airmass movement in the selected speed units (0 if None).
         show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
         write_excel_file: If true, collect STF columns and save them to an Excel file named "<glider> stf.xlsx".
-        reference_weight: (UI state) reference weight value from the selected glider (not documented for API use).
-        empty_weight: (UI state) empty weight value from the selected glider (not documented for API use).
+        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
     
     Returns:
-        tuple: An 11-item tuple matching the Dash callback outputs in order:
+        tuple: An 8-item tuple matching the Dash callback outputs in order:
             - Displayed glider name (str)
             - Status/statistics messages from the polar model (str)
-            - Reference weight placeholder text (str)
-            - Empty weight placeholder text (str)
-            - Pilot weight placeholder text (str)
             - Polar plot figure (plotly.graph_objs.Figure)
             - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
             - MacCready table row data as list of dicts
@@ -498,7 +409,6 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     global df_out
 
     logger.info(f'data from store: {data}')
-    logger.info(f'sequence from store: {sequence}')
 
     # Extract inputs
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
@@ -525,11 +435,8 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     if v_air_vert is None:
         v_air_vert = 0.0
 
-    # Set the units for unitless items from the user interface
+    # Set the units for unitless items from the data store
     maccready = maccready * sink_units.to('m/s')
-    print(f'{v_air_horiz=}, {v_air_vert=}')
-    v_air_horiz = v_air_horiz * speed_units.to('m/s')
-    v_air_vert = v_air_vert * speed_units.to('m/s')
 
     # A linear model has no solutions for the MacCready equations, 
     # so the model must be a quadratic or higher order polynomial.
@@ -708,16 +615,7 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
             "sizeToFit",
             degree,
             )
-"""
-    Output(component_id='main-title', component_property='children'),
-    Output(component_id='statistics', component_property='children'),
-    Output(component_id='graph-polar', component_property='figure'),
-    Output(component_id='graph-stf', component_property='figure'),
-    Output(component_id='mcAgGrid', component_property='rowData'),
-    Output(component_id='mcAgGrid', component_property='columnDefs'),
-    Output(component_id='mcAgGrid', component_property='columnSize'),
-    Output(component_id='poly-degree', component_property='value'),
-"""
+
 # Run the app
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8050))
