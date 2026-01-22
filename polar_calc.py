@@ -115,7 +115,7 @@ class Polar:
             float: Sink rate in meters per second (negative values indicate climb, positive values indicate descent).
         """
         w = self.__weight_factor
-        return w * self.__sink_poly(v/w) + self.__v_air_vert.magnitude
+        return w * self.__sink_poly(v/w) + self.__v_air_vert
 
     def sink_deriv(self, v):
         w = self.__weight_factor
@@ -124,7 +124,7 @@ class Polar:
     # Average cross-country speed accounting for thermalling time
     # using Eq (2) from the included document "MacCready Speed to Fly Theory.pdf"
     def v_avg(self, v, mc):
-        x = self.__v_air_horiz.magnitude
+        x = self.__v_air_horiz
         f = 1.0
         s = self.sink(v)
         return (mc*(v+x) - f*x*s)/(mc - s)
@@ -169,7 +169,7 @@ class Polar:
         # self.sink(v) includes Wm = self.__v_air_vert
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
-        ax = self.__v_air_horiz.magnitude
+        ax = self.__v_air_horiz
 
         return (s - ((1-f)*ax + v)*s_deriv - mc) / (mc - s)**2
 
