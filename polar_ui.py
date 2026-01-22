@@ -300,9 +300,9 @@ def process_unit_change(data, units, glider_name, pilot_weight_in, v_air_horiz_i
     """
     logger.debug(f'process_unit_change called _production_mode={_production_mode}')
     
-    pilot_weight = data['pilot_weight'] if data else None
-    v_air_horiz = data['v_air_horiz'] if data else None
-    v_air_vert = data['v_air_vert'] if data else None
+    pilot_weight = data.get('pilot_weight') if data else None
+    v_air_horiz = data.get('v_air_horiz') if data else None
+    v_air_vert = data.get('v_air_vert') if data else None
     
     selected_units = UNIT_CHOICES[units]
     weight_units = selected_units['Weight']
@@ -412,9 +412,9 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     # Extract inputs
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
-    pilot_weight = data['pilot_weight'] if data else None
-    v_air_horiz = data['v_air_horiz'] if data else None
-    v_air_vert = data['v_air_vert'] if data else None 
+    pilot_weight = data.get('pilot_weight') if data else None
+    v_air_horiz = data.get('v_air_horiz') if data else None
+    v_air_vert = data.get('v_air_vert') if data else None 
     logger.info(f'glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}')
 
     # handle display units option
@@ -436,7 +436,7 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
         v_air_vert = 0.0
 
     # Set the units for unitless items from the data store
-    maccready = maccready * sink_units.to('m/s')
+    maccready = (maccready * sink_units).to('m/s')
 
     # A linear model has no solutions for the MacCready equations, 
     # so the model must be a quadratic or higher order polynomial.
@@ -620,11 +620,22 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8050))
     debug = os.environ.get('DEBUG', '').lower() in ('true', '1', 'yes')
-    if port == 8050:
-        _production_mode = False
-        logger.info(f'Starting development server at http://localhost:{port}, debug={debug}')
+    
+    # Determine production mode from environment variable, with fallback to port-based detection
+    env_production = os.environ.get('PRODUCTION_MODE', '').lower()
+    env_environment = os.environ.get('ENVIRONMENT', '').lower()
+    
+    if env_production:
+        _production_mode = env_production in ('true', '1', 'yes')
+    elif env_environment:
+        _production_mode = env_environment == 'production'
+    else:
+        # Fallback to port-based detection for compatibility
+        _production_mode = port != 8050
+    
+    if not _production_mode:
+        logger.info(f'Starting development server at http://localhost:{port}, debug={debug}, production_mode={_production_mode}')
         app.run(debug=debug)
     else:
-        _production_mode = True
-        logger.info(f'Starting production server on port {port}, debug={debug}')
+        logger.info(f'Starting production server on port {port}, debug={debug}, production_mode={_production_mode}')
         app.run(host='0.0.0.0', port=port, debug=debug)
