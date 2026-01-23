@@ -13,6 +13,7 @@ from plotly.subplots import make_subplots
 import dash_ag_grid as dag
 
 import polar_calc
+import glider
 
 import pint
 import pint_pandas
@@ -29,6 +30,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(nam
 # define global variable
 df_out = None
 _production_mode = True
+_glider_cache = {}  # Cache for Glider instances to avoid duplicate CSV parsing
 
 # Read list of available polars from a file
 df_glider_info = pd.read_json('datafiles/gliderInfo.json')
@@ -45,12 +47,30 @@ METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
 US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs')}
 UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
-def load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
+def get_cached_glider(glider_name, current_glider_info):
+    """
+    Get or create a cached Glider instance to avoid duplicate CSV parsing.
+    
+    Parameters:
+        glider_name: Name of the glider
+        current_glider_info: DataFrame row with glider information
+    
+    Returns:
+        glider.Glider: Cached or newly created Glider instance
+    """
+    global _glider_cache
+    
+    if glider_name not in _glider_cache:
+        _glider_cache[glider_name] = glider.Glider(current_glider_info)
+    
+    return _glider_cache[glider_name]
+
+def load_polar(current_glider:glider.Glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
     current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
-    speed, _ = current_polar.get_polar()
+    speed, _ = current_glider.polar_data_magnitude()
 
     # Evaluate the polynomial for new points
-    speed = np.linspace(min(speed).magnitude, max(speed).magnitude, 100)
+    speed = np.linspace(min(speed), max(speed), 100)
     dfFit = pd.DataFrame({'Speed': PA_(speed, ureg.mps), 'Sink': PA_(current_polar.Sink(speed), ureg.mps)})
     
     return dfFit, current_polar
@@ -81,7 +101,7 @@ item_style = {
 }
 
 graph_style = {
-    "flex": "1 1 800px", # grow=1, shrink=1, base_width=450px
+    "flex": "1 1 800px", # grow=1, shrink=1, base_width=800px
     "min-width": "600px",
     "min-height": "400px"
 }
@@ -104,7 +124,7 @@ app.layout = dbc.Container([
                 dcc.Dropdown(
                     id="glider-dropdown",
                     options=dropdown_options,
-                    value='ASW 28', # dropdown_options[0]['value'] if dropdown_options else None, # Set a default value if options exist
+                    value=DEFAULT_GLIDER_NAME, # dropdown_options[0]['value'] if dropdown_options else None, # Set a default value if options exist
                     placeholder="Select a glider...", 
                     persistence=True, persistence_type='local'
                 ),
@@ -302,12 +322,12 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
     
     # Use default glider if none selected
     glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
-    current_glider = df_glider_info[df_glider_info['name'] == glider_name]
+    current_glider_info = df_glider_info[df_glider_info['name'] == glider_name]
 
     # Just return if no glider selected
-    if current_glider.empty:
+    if current_glider_info.empty:
         raise dash.exceptions.PreventUpdate
-
+    
     # Fetch stored values or initialize to None
     pilot_weight = data.get('pilot_weight') if data else None
     v_air_horiz = data.get('v_air_horiz') if data else None
@@ -346,9 +366,11 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
         else:
             v_air_vert = (v_air_vert_in * sink_units).to('m/s').magnitude
 
-    # These are all in kg but stored as floats without units    
-    reference_weight = current_glider['referenceWeight'].iloc[0] * ureg('kg')
-    empty_weight = current_glider['emptyWeight'].iloc[0] * ureg('kg')
+    # Get or create cached Glider instance to avoid duplicate CSV parsing
+    current_glider = get_cached_glider(glider_name, current_glider_info)
+
+    reference_weight = current_glider.referenceWeight().to(selected_units['Weight']).magnitude
+    empty_weight = current_glider.emptyWeight().to(selected_units['Weight']).magnitude
 
     reference_pilot_weight = reference_weight - empty_weight 
 
@@ -357,11 +379,10 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
             f"Pilot + Ballast weight ({weight_units.units:~P}):",
             f"Horizontal speed ({selected_units['Speed'].units:~P}):",
             f"Vertical speed ({selected_units['Sink'].units:~P}):", 
-            f"{reference_weight.to(selected_units['Weight']).magnitude:.1f}",
-            f"{empty_weight.to(selected_units['Weight']).magnitude:.1f}",
-            f"{reference_pilot_weight.to(selected_units['Weight']).magnitude:.1f}",
+            f"{reference_weight:.1f}",
+            f"{empty_weight:.1f}",
+            f"{reference_pilot_weight:.1f}",
             f"{(pilot_weight * ureg('kg')).to(selected_units['Weight']).magnitude:.1f}" if pilot_weight is not None else None,
-            #(pilot_weight * ureg('kg')).to(selected_units['Weight']).magnitude if pilot_weight is not None else None,
             f"{(v_air_horiz * ureg('m/s')).to(speed_units).magnitude:.1f}" if v_air_horiz is not None else None,
             f"{(v_air_vert * ureg('m/s')).to(sink_units).magnitude:.1f}" if v_air_vert is not None else None,
             {'pilot_weight': pilot_weight, 'v_air_horiz': v_air_horiz, 'v_air_vert': v_air_vert}
@@ -421,11 +442,14 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     # Use default glider if none selected
     glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
-    current_glider = df_glider_info[df_glider_info['name'] == glider_name]
+    current_glider_info = df_glider_info[df_glider_info['name'] == glider_name]
 
     # Just return if no glider selected
-    if current_glider.empty:
+    if current_glider_info.empty:
         raise dash.exceptions.PreventUpdate
+
+    # Get or create cached Glider instance to avoid duplicate CSV parsing
+    current_glider = get_cached_glider(glider_name, current_glider_info)
 
     # Fetch stored values or initialize to None
     pilot_weight = data.get('pilot_weight') if data else None
@@ -464,8 +488,8 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
-    trace_data = go.Scatter(x=current_polar.getSpeedData().to(speed_units).magnitude,
-                        y=current_polar.getSinkData().to(sink_units).magnitude,
+    trace_data = go.Scatter(x=current_glider.get_speed_data().to(speed_units).magnitude,
+                        y=current_glider.get_sink_data().to(sink_units).magnitude,
                         mode='markers',
                         name='Polar Data',)
     polar_graph.add_trace(trace_data)
@@ -478,9 +502,9 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     if show_debug_graphs:
         # Graph the residuals (difference between the data and the fit)
-        speed_data = current_polar.getSpeedData().to(speed_units)
-        sink_fit = current_polar.Sink(current_polar.getSpeedData().magnitude)
-        resid = current_polar.getSinkData().to(sink_units) - (sink_fit * ureg('m/s')).to(sink_units)
+        speed_data = current_glider.get_speed_data().to(speed_units)
+        sink_fit = current_polar.Sink(current_glider.get_speed_data().magnitude)
+        resid = current_glider.get_sink_data().to(sink_units) - (sink_fit * ureg('m/s')).to(sink_units)
         trace_residuals = go.Scatter(x=speed_data.magnitude,
                             y=resid.magnitude,
                             name=f"Residuals")
@@ -490,7 +514,7 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     if (weight_factor != 1.0):
         trace_weight_adjusted = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude * weight_factor,
                             y=df_fit['Sink'].pint.to(sink_units).pint.magnitude * weight_factor,
-                            name=f"Adjusted to {(current_polar.get_weight_fly() * ureg('kg')).to(weight_units).magnitude:.1f} {weight_units.units:~P}")
+                            name=f"Adjusted to {current_polar.get_weight_fly().to(weight_units).magnitude:.1f} {weight_units.units:~P}")
         polar_graph.add_trace(trace_weight_adjusted)
 
     polar_graph.update_layout(

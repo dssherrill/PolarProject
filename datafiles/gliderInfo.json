@@ -31,5 +31,16 @@
         "emptyWeight": 462.5,
         "fitStart":50,
         "fitEnd":200
+    },
+    {
+        "name":"SGS 1-34C",
+        "polarFileName":"SGS 1-34C.csv",
+        "speedUnits":"mph",
+        "sinkUnits":"ft\/sec",
+        "weightUnits":"lbs",
+        "referenceWeight":660.0,
+        "emptyWeight": 570.0,
+        "fitStart":50,
+        "fitEnd":200
     }
 ]
