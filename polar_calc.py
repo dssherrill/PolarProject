@@ -9,6 +9,8 @@ import pint
 import pint_pandas
 import logging
 
+import glider
+
 # Get access to the one-and-only UnitsRegistry instance
 from units import ureg
 PA_ = pint_pandas.PintArray
@@ -16,7 +18,7 @@ Q_ = ureg.Quantity
 logger = logging.getLogger(__name__)
 
 class Polar:
-    def __init__(self, current_glider, degree, goal, v_air_horiz, v_air_vert, pilot_weight=None):
+    def __init__(self, current_glider:glider.Glider, degree, goal, v_air_horiz, v_air_vert, pilot_weight=None):
         """
         Create a Polar model configured from a glider dataset and flight conditions.
         
@@ -42,25 +44,20 @@ class Polar:
         self.__goal_selection = goal
         self.__v_air_horiz = v_air_horiz
         self.__v_air_vert = v_air_vert
-        self.__ref_weight = current_glider['referenceWeight'].iloc[0]
-        self.__empty_weight = current_glider['emptyWeight'].iloc[0]
-        if pilot_weight is None:
-            self.__weight_fly = self.__ref_weight
-        else:
-            self.__weight_fly = self.__empty_weight + pilot_weight
+#        self.__ref_weight = current_glider['referenceWeight'].iloc[0]
+#        self.__empty_weight = current_glider['emptyWeight'].iloc[0]
+        self.__weight_fly = current_glider.emptyWeight() + pilot_weight*ureg('kg') if pilot_weight is not None else current_glider.referenceWeight()
 
         self.__messages = ""
 
         # Weight factor used to scale the polar sink rates
-        if self.__ref_weight == 0:
+        if current_glider.referenceWeight() == 0:
             msg = "Reference weight is zero; forcing weight factor to 1.0"
             logger.error(msg)
             self.__messages += msg + "\n"
             self.__weight_factor = 1.0
         else:
-            self.__weight_factor = np.sqrt(self.__weight_fly/self.__ref_weight)
-
-        self.load_CSV(current_glider['polarFileName'].iloc[0])
+            self.__weight_factor = np.sqrt(self.__weight_fly/current_glider.referenceWeight())
 
         self.fit_polar(degree)
 
@@ -73,8 +70,8 @@ class Polar:
         """
         return self.__messages
     
-    def get_reference_pilot_weight(self):
-        return self.__ref_weight - self.__empty_weight
+    # def get_reference_pilot_weight(self):
+    #     return self.__ref_weight - self.__empty_weight
     
     def get_weight_fly(self):
         return self.__weight_fly
@@ -114,11 +111,11 @@ class Polar:
         Returns:
             float: Sink rate in meters per second (negative values indicate climb, positive values indicate descent).
         """
-        w = self.__weight_factor
+        w = self.__weight_factor.magnitude
         return w * self.__sink_poly(v/w) + self.__v_air_vert
 
     def sink_deriv(self, v):
-        w = self.__weight_factor
+        w = self.__weight_factor.magnitude
         return self.__sink_deriv_poly(v/w)
 
     # Average cross-country speed accounting for thermalling time
@@ -155,7 +152,8 @@ class Polar:
         # the rising thermal has significant mass and does not immediately accelerate
         # to the speed of the wind around it
         """
-        Compute the normalized objective residual used to select the speed-to-fly that maximizes average cross-country speed, accounting for thermal drift.
+        Compute the derivative (d/dV)Vavg(V) used to select the speed-to-fly that 
+        maximizes average cross-country speed, accounting for thermal drift.
         
         Parameters:
             v (float): True airspeed at which to evaluate the objective (m/s).
@@ -185,8 +183,7 @@ class Polar:
             degree (int): Polynomial degree to fit to the sink-rate data.
         """
         self.__degree = degree        
-        speed = self.__speed_data.magnitude
-        sink = self.__sink_data.magnitude
+        speed, sink = self.__glider.polar_data_magnitude()
 
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
@@ -278,75 +275,4 @@ class Polar:
                             'solverResult': solver_result
                             })
         return df_mc
-    
-    # Throughout this code, the conventional units are
-    #  m/s for speed and 
-    #  kg for weight
-
-    # Reads a polar from a CSV file created by WebPlotDigitizer at https://automeris.io/
-    # x = first column  = speed in km per hour
-    # y = second column = sink in m per second (all values should be negative)
-    def load_CSV(self, polar_file_name):
-        """
-        Load polar speed and sink data from a CSV file in ./datafiles and store them as pint-quantified NumPy arrays.
-        
-        Parameters:
-            polar_file_name (str): CSV file name located in ./datafiles/; expected format: first column = speed in km/h, second column = sink in m/s.
-        
-        Description:
-            - On success populates self.__speed_data with speeds converted to meters per second and self.__sink_data with sink rates as meters per second.
-            - On FileNotFoundError sets both __speed_data and __sink_data to None and appends an error message to self.__messages.
-            - On any other exception sets both __speed_data and __sink_data to None and appends the exception message to self.__messages.
-            - Raises ValueError if the loaded speed or sink arrays are missing or empty after reading the CSV.
-        """
-        logger.debug(f'polarFileName is "{polar_file_name}"')
-        file_path = f"./datafiles/{polar_file_name}"
-        logger.debug(f'file_path is "{file_path}"')
-
-        try:
-            df_polar = pd.read_csv(file_path)
-        except FileNotFoundError:
-            self.__messages += f"Error: The file '{file_path}' was not found.\n"
-            # Explicitly mark data as not loaded so callers can detect failure
-            self.__speed_data = None
-            self.__sink_data = None
-            return None
-        except Exception as e:
-            # Catch any exceptions, record message and return early to avoid using undefined df_polar
-            self.__messages += f"An unexpected error occurred: {e}\n"
-            self.__speed_data = None
-            self.__sink_data = None
-            return None
-
-        # Convert speed from km/hr to m/s
-        self.__speed_data = (df_polar.iloc[:,0].to_numpy() * ureg.kph).to('mps')
-
-        # Sink is already in m/s
-        self.__sink_data = df_polar.iloc[:,1].to_numpy() * ureg.mps
-
-        # Ensure CSV data loaded successfully before fitting
-        if self.__speed_data is None or len(self.__speed_data) == 0:
-            raise ValueError('Polar speed data not loaded or empty; cannot fit polar.')
-        if self.__sink_data is None or len(self.__sink_data) == 0:
-            raise ValueError('Polar sink data not loaded or empty; cannot fit polar.')
-
-
-    def get_polar(self):
-        """
-        Retrieve the loaded polar speed and sink datasets.
-        
-        Returns:
-            tuple: (speed_data, sink_data)
-                speed_data: Sequence of speeds as pint `Quantity` in meters per second.
-                sink_data: Corresponding sink rates as pint `Quantity` in meters per second.
-        """
-        return self.__speed_data, self.__sink_data
-    
-    def getSpeedData(self):
-        return self.__speed_data
-    
-    def getSinkData(self):
-        return self.__sink_data
-    
-
     
