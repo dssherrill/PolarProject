@@ -32,7 +32,7 @@ _production_mode = True
 
 # Read list of available polars from a file
 df_glider_info = pd.read_json('datafiles/gliderInfo.json')
-current_glider = df_glider_info[df_glider_info['name'] == 'ASK 21']
+DEFAULT_GLIDER_NAME = 'ASW 28'
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -300,16 +300,25 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
     """
     logger.debug(f'process_unit_change called _production_mode={_production_mode}')
     
+    # Use default glider if none selected
+    glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
+    current_glider = df_glider_info[df_glider_info['name'] == glider_name]
+
+    # Just return if no glider selected
+    if current_glider.empty:
+        raise dash.exceptions.PreventUpdate
+
+    # Fetch stored values or initialize to None
     pilot_weight = data.get('pilot_weight') if data else None
     v_air_horiz = data.get('v_air_horiz') if data else None
     v_air_vert = data.get('v_air_vert') if data else None
     
+    # setup units
     selected_units = UNIT_CHOICES[units]
     weight_units = selected_units['Weight']
     speed_units = selected_units['Speed']
     sink_units = selected_units['Sink']
 
-    current_glider = df_glider_info[df_glider_info['name'] == glider_name]
 
     set_props('toggle-switch-dump', {'disabled': _production_mode})
 
@@ -410,14 +419,21 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     logger.info(f'data from store: {data}')
 
-    # Extract inputs
+    # Use default glider if none selected
+    glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
     current_glider = df_glider_info[df_glider_info['name'] == glider_name]
+
+    # Just return if no glider selected
+    if current_glider.empty:
+        raise dash.exceptions.PreventUpdate
+
+    # Fetch stored values or initialize to None
     pilot_weight = data.get('pilot_weight') if data else None
     v_air_horiz = data.get('v_air_horiz') if data else None
     v_air_vert = data.get('v_air_vert') if data else None 
     logger.info(f'glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}')
 
-    # handle display units option
+    # Setup units
     selected_units = UNIT_CHOICES[units]
     sink_units = selected_units['Sink']
     speed_units = selected_units['Speed']
