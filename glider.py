@@ -69,16 +69,10 @@ class Glider:
             df_polar = pd.read_csv(file_path, header=None)
         except FileNotFoundError:
             self.__messages += f"Error: The file '{file_path}' was not found.\n"
-            # Explicitly mark data as not loaded so callers can detect failure
-            self.__speed_data = None
-            self.__sink_data = None
-            return None
+            raise FileNotFoundError(f"Polar data file not found: {file_path}")
         except Exception as e:
-            # Catch any exceptions, record message and return early to avoid using undefined df_polar
             self.__messages += f"An unexpected error occurred ({type(e).__name__}): {e}\n"
-            self.__speed_data = None
-            self.__sink_data = None
-            return None
+            raise RuntimeError(f"Failed to load polar data: {e}") from e
 
         # Convert speed data to m/s
         self.__speed_data = (df_polar.iloc[:,0].to_numpy() * speed_units).to('m/s')
