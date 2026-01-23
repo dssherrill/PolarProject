@@ -18,6 +18,24 @@ logger = logging.getLogger(__name__)
 
 class Glider:
     def __init__(self, current_glider):
+        """
+        Initialize a Glider instance from a DataFrame containing glider metadata and a polar file reference.
+        
+        Parameters:
+            current_glider (pandas.DataFrame): A single-row DataFrame providing glider configuration. Required columns:
+                - 'speedUnits', 'sinkUnits', 'weightUnits': unit strings understood by the module's unit registry.
+                - 'name': glider name.
+                - 'referenceWeight', 'emptyWeight': numeric weights expressed in the specified weight units.
+                - 'polarFileName': filename of the CSV containing polar data (used by load_CSV).
+        
+        Side effects:
+            - Sets internal attributes:
+                - self.__messages (str): accumulator for status/error messages.
+                - self.__name (str): glider name.
+                - self.__ref_weight (pint.Quantity): reference weight converted to kilograms.
+                - self.__empty_weight (pint.Quantity): empty weight converted to kilograms.
+                - Loads and stores polar data by calling self.load_CSV(current_glider, speed_units, sink_units).
+        """
         logger = logging.getLogger(__name__)
         logger.debug('Entering Glider.__init__')
 
@@ -47,16 +65,19 @@ class Glider:
     # y = second column = sink in m per second (all values should be negative)
     def load_CSV(self, current_glider, speed_units, sink_units):
         """
-        Load polar speed and sink data from a CSV file in ./datafiles and store them as pint-quantified NumPy arrays.
+        Load polar speed and sink data from the CSV named in `current_glider` and store them as pint-quantified arrays in meters per second.
         
         Parameters:
-            polar_file_name (str): CSV file name located in ./datafiles/; expected format: first column = speed in km/h, second column = sink in m/s.
+            current_glider (pandas.DataFrame): DataFrame containing a `polarFileName` column; the first row's value is used to locate the CSV under `./datafiles/`.
+            speed_units (pint.Unit or pint.Quantity): Unit to apply to the first CSV column (speed).
+            sink_units (pint.Unit or pint.Quantity): Unit to apply to the second CSV column (sink rate).
         
-        Description:
-            - On success populates self.__speed_data with speeds converted to meters per second and self.__sink_data with sink rates as meters per second.
-            - On FileNotFoundError sets both __speed_data and __sink_data to None and appends an error message to self.__messages.
-            - On any other exception sets both __speed_data and __sink_data to None and appends the exception message to self.__messages.
-            - Raises ValueError if the loaded speed or sink arrays are missing or empty after reading the CSV.
+        Behavior:
+            - Reads ./datafiles/{polarFileName} with no header; expects column 0 = speed, column 1 = sink.
+            - Populates `self.__speed_data` and `self.__sink_data` with the CSV columns converted to meters per second and kept as pint-quantified NumPy arrays.
+            - Appends a descriptive message to `self.__messages` and raises `FileNotFoundError` when the file is missing.
+            - Appends a descriptive message to `self.__messages` and raises `RuntimeError` for other I/O/parsing errors.
+            - Raises `ValueError` if either loaded column is empty after conversion.
         """
 
         polar_file_name = current_glider['polarFileName'].iloc[0]
@@ -89,35 +110,65 @@ class Glider:
 
     def polar_data_magnitude(self):
         """
-        Retrieve the loaded polar speed and sink datasets.
+        Return the magnitudes of the loaded polar speed and sink datasets in meters per second.
         
         Returns:
-            tuple: (speed_data, sink_data)
-                speed_data: Sequence of speeds as floats in meters per second.
-                sink_data: Corresponding sink rates as floats in meters per second.
+            tuple: (speed_magnitudes, sink_magnitudes)
+                speed_magnitudes: Sequence[float] — speeds in meters per second.
+                sink_magnitudes: Sequence[float] — sink rates in meters per second.
         """
         return self.__speed_data.magnitude, self.__sink_data.magnitude
     
     def get_speed_data(self):
+        """
+        Retrieve the glider's speed data as a Pint-quantified array expressed in meters per second.
+        
+        Returns:
+            speed_data (pint.Quantity or pint_pandas.PintArray): Array of speed values with units of meters per second.
+        """
         return self.__speed_data
     
     def get_sink_data(self):
+        """
+        Return the glider's sink-rate dataset as a pint-quantified array in meters per second.
+        
+        Returns:
+            sink_data (pint.Quantity or pint_pandas.PintArray): Array of sink rates converted to meters per second.
+        """
         return self.__sink_data
 
     def referenceWeight(self):
+        """
+        Get the glider's reference weight.
+        
+        Returns:
+            reference_weight (pint.Quantity): Reference weight expressed in kilograms.
+        """
         return self.__ref_weight
     
     def emptyWeight(self):
+        """
+        Return the glider's empty weight.
+        
+        Returns:
+            pint.quantity: Empty weight expressed in kilograms.
+        """
         return self.__empty_weight
     
     def messages(self):
         """
-        Return the accumulated status and error messages recorded by this Polar instance.
+        Get accumulated status and error messages recorded by the Glider.
         
         Returns:
-            str: Concatenated message string collected during operations (may be empty).
+            str: Concatenated messages collected during operations; empty string if none.
         """
         return self.__messages
 
     def name(self):
+        """
+        Retrieve the glider's name.
+        
+        Returns:
+            str: The glider name from the input metadata.
+        """
         return self.__name    

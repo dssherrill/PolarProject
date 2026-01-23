@@ -20,25 +20,24 @@ logger = logging.getLogger(__name__)
 class Polar:
     def __init__(self, current_glider:glider.Glider, degree, goal, v_air_horiz, v_air_vert, pilot_weight=None):
         """
-        Create a Polar model configured from a glider dataset and flight conditions.
+        Initialize a Polar model from a Glider object and flight conditions.
         
         Parameters:
-            current_glider (pandas.DataFrame): Glider record containing at least the keys
-                'referenceWeight', 'emptyWeight', and 'polarFileName' in its first row.
-            degree (int): Polynomial degree to use when fitting the polar sink-rate curve.
-            goal (str): Goal selection identifier used by goal_function (e.g., 'Reichmann', 'Test').
-            v_air_horiz: Horizontal component of airspeed (units/quantity expected by the caller).
-            v_air_vert: Vertical component of airspeed (units/quantity expected by the caller).
-            pilot_weight (optional): Pilot weight to use in flight weight calculation. If omitted,
-                the reference weight from current_glider is used; if provided, flight weight is
-                computed as empty weight plus pilot_weight.
+            current_glider (glider.Glider): Glider object providing reference and empty weights and polar data.
+            degree (int): Polynomial degree to fit the sink-rate (polar) curve.
+            goal (str): Identifier for the STF objective to use (e.g., 'Reichmann', 'Test').
+            v_air_horiz (Quantity or float): Horizontal component of ambient air velocity (units expected by caller).
+            v_air_vert (Quantity or float): Vertical component of ambient air velocity (units expected by caller).
+            pilot_weight (optional, Quantity or float): Pilot weight to add to empty weight; if omitted, the glider's reference weight is used.
+        
+        Behavior:
+            - Computes flight weight from glider.emptyWeight() plus pilot_weight when provided, otherwise uses glider.referenceWeight().
+            - Computes a weight-scaling factor (sqrt(flight_weight / referenceWeight)); if reference weight is zero, records an error message and uses a factor of 1.0.
+            - Stores configuration and computed values on the instance and initializes an internal message buffer.
+            - Fits the polar polynomial by calling fit_polar(degree) which loads polar data from the glider.
         
         Side effects:
-            - Stores configuration and computed values (reference/empty weight, flight weight,
-              weight factor, goal selection, airspeed components) on the instance.
-            - Initializes an internal messages string.
-            - Loads polar data from the CSV referenced by current_glider and fits the polar
-              polynomial using the specified degree.
+            Updates instance state (glider, goal selection, ambient air components, flight weight, weight factor, messages) and fits the sink-rate polynomial.
         """
         self.__glider = current_glider
         self.__goal_selection = goal
@@ -63,10 +62,10 @@ class Polar:
 
     def messages(self):
         """
-        Return the accumulated status and error messages recorded by this Polar instance.
+        Retrieve the accumulated status and error messages for this Polar instance.
         
         Returns:
-            str: Concatenated message string collected during operations (may be empty).
+            str: Concatenated message string collected during operations; may be empty.
         """
         return self.__messages
     
@@ -74,6 +73,12 @@ class Polar:
     #     return self.__ref_weight - self.__empty_weight
     
     def get_weight_fly(self):
+        """
+        Return the computed flight weight used for performance calculations.
+        
+        @returns
+            flight_weight (pint.Quantity): The aircraft's flight weight (includes pilot if provided), expressed as a quantity with units.
+        """
         return self.__weight_fly
     
     def get_weight_factor(self):
@@ -115,6 +120,15 @@ class Polar:
         return w * self.__sink_poly(v/w) + self.__v_air_vert
 
     def sink_deriv(self, v):
+        """
+        Compute the derivative of the sink rate with respect to true airspeed, adjusted by the configured weight factor.
+        
+        Parameters:
+            v (float): True airspeed at which to evaluate the derivative (same units as polar fit input).
+        
+        Returns:
+            float: Value of d(sink)/d(v) at the given speed, scaled by the instance weight factor.
+        """
         w = self.__weight_factor.magnitude
         return self.__sink_deriv_poly(v/w)
 
@@ -175,9 +189,9 @@ class Polar:
     # degree: the degree (order) of the polynomial to use
     def fit_polar(self, degree):
         """
-        Fit the polar sink-rate data to a polynomial and record fit-quality metrics.
+        Fit the glider's sink-rate polar data to a polynomial and record fit-quality metrics.
         
-        Fits the instance's loaded speed and sink data to a polynomial of the given degree. For degree == 2 the fit starts at the speed corresponding to the minimum sink; otherwise the full dataset is used. The fitted polynomial and its derivative are stored on the instance, and the method computes predicted sink values to derive and append R^2 and mean squared error (MSE) information to the instance message log.
+        Fits speed vs. sink data from the associated glider to a polynomial of the given degree, stores the fitted polynomial and its derivative on the instance, and appends fit-quality metrics (Pearson R^2 and mean squared error) to the instance message log. For degree == 2 the fit ignores data at speeds below the minimum-sink point; for other degrees the full dataset is used.
         
         Parameters:
             degree (int): Polynomial degree to fit to the sink-rate data.

@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 import numpy as np
 import dash
@@ -66,6 +66,22 @@ def get_cached_glider(glider_name, current_glider_info):
     return _glider_cache[glider_name]
 
 def load_polar(current_glider:glider.Glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
+    """
+    Create a Polar model for a glider and return a fitted speed–sink DataFrame and the Polar instance.
+    
+    Parameters:
+        current_glider (glider.Glider): Glider object providing polar and weight data.
+        degree (int): Polynomial degree used to fit the polar curve.
+        goal_function (str): Objective used by the polar solver (e.g., 'Reichmann' or 'Test').
+        v_air_horiz (pint.Quantity or numeric): Horizontal airmass speed to include in the polar (units of speed).
+        v_air_vert (pint.Quantity or numeric): Vertical airmass speed (sink) to include in the polar (units of speed).
+        pilot_weight (pint.Quantity or numeric): Combined pilot and ballast weight to use for weight-adjusted polar (units of mass).
+    
+    Returns:
+        tuple:
+            dfFit (pandas.DataFrame): DataFrame with columns 'Speed' and 'Sink' containing 100 evenly spaced speeds and their fitted sink rates; values are PintArray quantities in meters per second.
+            current_polar (polar_calc.Polar): The constructed Polar object configured with the provided parameters.
+    """
     current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
     speed, _ = current_glider.polar_data_magnitude()
 
@@ -308,15 +324,33 @@ app.layout = dbc.Container([
 )
 def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_air_vert_in, data):
     """
-    Update labels based on the selected unit system.
+    Update UI labels and stored user data when the unit system or related inputs change.
     
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        units: Unit system key ('Metric' or 'US') determining weight display units.
-        glider_name: Name of the selected glider as present in the glider info dataset
-        pilot_weight_in: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
-        v_air_horiz_in: Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
-        v_air_vert_in: Vertical airmass speed entered by the user in the selected sink units (None to leave unchanged).
+        units (str): Unit system key ('Metric' or 'US') used to determine display units.
+        glider_name (str | None): Selected glider name; defaults to the module default when falsy.
+        pilot_weight_in (float | None): Pilot+ballast weight value entered by the user in the selected weight units; None means leave stored value unchanged.
+        v_air_horiz_in (float | None): Horizontal airmass speed value entered by the user in the selected speed units; None means leave stored value unchanged.
+        v_air_vert_in (float | None): Vertical airmass (sink) speed value entered by the user in the selected sink units; None means leave stored value unchanged.
+        data (dict | None): Stored user data dictionary that may contain 'pilot_weight', 'v_air_horiz', and 'v_air_vert' (all stored as SI magnitudes).
+    
+    Returns:
+        tuple: A 12-tuple containing:
+            - label for reference weight (str)
+            - label for empty weight (str)
+            - label for pilot+ballast weight (str)
+            - label for horizontal speed (str)
+            - label for vertical speed (str)
+            - formatted reference weight value as string
+            - formatted empty weight value as string
+            - formatted reference pilot weight value as string
+            - formatted pilot+ballast weight value or None if not set (str | None)
+            - formatted horizontal airmass speed value or None if not set (str | None)
+            - formatted vertical airmass (sink) speed value or None if not set (str | None)
+            - updated data dict with keys 'pilot_weight', 'v_air_horiz', 'v_air_vert' (SI magnitudes or None)
+    
+    Raises:
+        dash.exceptions.PreventUpdate: If the selected glider cannot be found in the glider info dataset.
     """
     logger.debug(f'process_unit_change called _production_mode={_production_mode}')
     
@@ -411,27 +445,22 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
 )
 def update_graph(data, degree, glider_name, maccready, goal_function, show_debug_graphs, write_excel_file, units,):
     """
-    Update the UI graphs, MacCready table, and related display values based on the current inputs.
-    
-    Updates the polar and speed-to-fly figures, computes MacCready table rows (converted to the selected units), optionally appends STF results to an Excel file, and returns all UI outputs required by the Dash callback.
+    Update the displayed polar and Speed-to-Fly figures, compute the MacCready table in the selected units, and produce the UI outputs required by the Dash callback.
     
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        degree: Polynomial degree to fit the polar (treated as minimum 2 if lower or None).
-        glider_name: Name of the selected glider as present in the glider info dataset.
-        maccready: MacCready setting value in the currently selected sink units (0 if None).
-        goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
-        show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
-        write_excel_file: If true, collect STF columns and save them to an Excel file named "<glider> stf.xlsx".
-        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
+        data: Stored user data dictionary; expected keys include 'pilot_weight', 'v_air_horiz', and 'v_air_vert'.
+        maccready: MacCready setting expressed in the currently selected sink units.
+        units: Unit system key ('Metric' or 'US') that determines speed, sink, and weight display units.
+        write_excel_file: If true, append the computed STF column to an accumulating DataFrame and write it to "<glider> stf.xlsx".
+        show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the plots.
     
     Returns:
-        tuple: An 8-item tuple matching the Dash callback outputs in order:
+        tuple: Eight values in this order:
             - Displayed glider name (str)
             - Status/statistics messages from the polar model (str)
             - Polar plot figure (plotly.graph_objs.Figure)
             - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
-            - MacCready table row data as list of dicts
+            - MacCready table row data as list of dicts (records)
             - Column definitions for the MacCready AG Grid (list[dict])
             - Column sizing mode for the AG Grid (str)
             - Effective polynomial degree used (int)
