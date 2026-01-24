@@ -33,6 +33,17 @@
         "fitEnd":200
     },
     {
+        "name":"JS3 JET",
+        "polarFileName":"JS3 JET.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":597.0,
+        "emptyWeight": 325,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
         "name":"SGS 1-34C",
         "polarFileName":"SGS 1-34C.csv",
         "speedUnits":"mph",
