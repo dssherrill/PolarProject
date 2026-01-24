@@ -623,7 +623,7 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     if (sink_units == ureg('m/s')):
         # MacCready values for table, in m/s
-        mc_table =  np.arange(start=0.0, stop=3.0, step=0.5) * ureg.mps
+        mc_table =  np.arange(start=0.0, stop=3.05, step=0.5) * ureg.mps
     else:
         # MacCready values for table in knots, but must be coverted to m/s
         mc_table =  (np.arange(start=0.0, stop=6.1, step=1.0) * ureg.knots).to(ureg.mps)
