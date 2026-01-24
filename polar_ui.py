@@ -227,6 +227,8 @@ app.layout = dbc.Container([
                             'type': 'numericColumn'
                             } for i in initial_data.columns],
                             columnSize="autoSize",
+                            dashGridOptions={"pagination": False},
+                            style={"height": 550, "width": "100%"},
                             id='mcAgGrid')
     ], style=item_style), # width=3)
 
@@ -542,8 +544,8 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     polar_graph.update_yaxes(tickformat=".1f", secondary_y=False) 
 
     # Graph Speed-to-Fly vs. MC setting
-    # MacCready values for table, zero to 6 knots, but must be coverted to m/s
-    mc_table =  (np.arange(start=0.0, stop=6.1, step=0.02) * ureg.knots).to('m/s')
+    # MacCready values for table, zero to 10 knots, but must be converted to m/s
+    mc_table =  (np.arange(start=0.0, stop=10.01, step=0.02) * ureg.knots).to('m/s')
     df_mc = current_polar.MacCready(mc_table)
     v =df_fit['Speed'].pint.magnitude
 
@@ -623,10 +625,10 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
 
     if (sink_units == ureg('m/s')):
         # MacCready values for table, in m/s
-        mc_table =  np.arange(start=0.0, stop=3.05, step=0.5) * ureg.mps
+        mc_table =  np.arange(start=0.0, stop=5.1, step=0.5) * ureg.mps
     else:
         # MacCready values for table in knots, but must be coverted to m/s
-        mc_table =  (np.arange(start=0.0, stop=6.1, step=1.0) * ureg.knots).to(ureg.mps)
+        mc_table =  (np.arange(start=0.0, stop=10.1, step=1.0) * ureg.knots).to(ureg.mps)
     
     df_mc = current_polar.MacCready(mc_table)
 

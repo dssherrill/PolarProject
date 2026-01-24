@@ -39,7 +39,7 @@
         "sinkUnits":"m\/s",
         "weightUnits":"kg",
         "referenceWeight":597.0,
-        "emptyWeight": 325,
+        "emptyWeight": 328,
         "fitStart":50,
         "fitEnd":200
     },
@@ -51,6 +51,17 @@
         "weightUnits":"lbs",
         "referenceWeight":660.0,
         "emptyWeight": 570.0,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"Ventus 2cT",
+        "polarFileName":"Ventus 2cT.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/sec",
+        "weightUnits":"kg",
+        "referenceWeight":565.0,
+        "emptyWeight": 360.0,
         "fitStart":50,
         "fitEnd":200
     }
