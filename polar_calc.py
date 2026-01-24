@@ -247,7 +247,7 @@ class Polar:
         # For each MC value, find the speed at which "goal_function" is equal to zero
         for i in range(len(mcTable)):
             mc = mcTable[i]
-            [solution, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc.magnitude), full_output=True, xtol=1e-5)
+            [solution, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc.magnitude), full_output=True, xtol=0.01)
             if err == 1:
                 v = solution[0]
                 Vstf[i] = v
