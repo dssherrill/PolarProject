@@ -15,7 +15,6 @@ import glider
 # Get access to the one-and-only UnitsRegistry instance
 from units import ureg
 PA_ = pint_pandas.PintArray
-Q_ = ureg.Quantity
 logger = logging.getLogger(__name__)
 
 class Polar:
@@ -102,19 +101,24 @@ class Polar:
         else:
             raise ValueError(f'Goal selection is {g} but must be "Reichmann" or "Test".')
             
-    def sink(self, v):
+    def sink(self, v, weight_correction=True, include_airmass=True):
         """
         Compute the glider's sink rate at a given true airspeed, scaled for the configured weight and adjusted by the ambient vertical airspeed.
         
         Parameters:
             v (float): True airspeed at which to evaluate the polar, in meters per second.
+            weight_correction (bool): If True, scale the sink rate by the weight factor; if False, return unscaled sink rate.
+            include_airmass (bool): If True, add the configured vertical air mass movement to the sink rate; if False, return sink rate without air mass adjustment.
         
         Returns:
             float: Sink rate in meters per second (negative values indicate climb, positive values indicate descent).
         """
-        w = self.__weight_factor
-        return w * self.__sink_poly(v/w) + self.__v_air_vert
-
+        w = self.__weight_factor if weight_correction else 1.0
+        s = w * self.__sink_poly(v/w) 
+        if include_airmass:
+            s += self.__v_air_vert
+        return s
+    
     def sink_deriv(self, v):
         w = self.__weight_factor
         return self.__sink_deriv_poly(v/w)
@@ -185,8 +189,8 @@ class Polar:
         """
         self.__degree = degree        
         speed, sink = self.__glider.polar_data_magnitude()
-        self.__solver_range = (min(speed), max(speed))
-        logger.debug(f'Fitting polar of degree {degree} over speed range {self.__solver_range[0]:.3f} to {self.__solver_range[1]:.3f} m/s')
+        self.speed_range = (min(speed), max(speed))
+        logger.debug(f'Fitting polar of degree {degree} over speed range {self.speed_range[0]:.3f} to {self.speed_range[1]:.3f} m/s')
 
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
@@ -222,9 +226,6 @@ class Polar:
 
         logger.info(f'{self.__messages}')
 
-    def Sink(self, speed):
-        return self.__sink_poly(speed)
-    
     def normal_solver(self, initial_guess, mc):
         [sol, _, err, _msg] = fsolve(self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6)
         if err == 1:
@@ -237,7 +238,7 @@ class Polar:
     
     def bruteforce_solver(self, initial_guess, mc):
         # First, find a workable range
-        working_range = (initial_guess, self.__solver_range[1])
+        working_range = (initial_guess, self.speed_range[1])
         r0_val = self.goal_function(working_range[0], mc)
         r1_val = self.goal_function(working_range[1], mc)
         solution = None
@@ -246,7 +247,7 @@ class Polar:
             # Brute force search for a better range
             logger.debug(f'Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})')
             r0 = working_range[0]
-            for r1 in np.arange(working_range[0], 1.5 * self.__solver_range[1], 5.0):
+            for r1 in np.arange(working_range[0], 1.5 * self.speed_range[1], 5.0):
                 r1_val = self.goal_function(r1, mc)
                 if r0_val * r1_val < 0:
                     working_range = (r0, r1)
@@ -256,7 +257,7 @@ class Polar:
                 r0_val = r1_val
 
         if r0_val * r1_val > 0:
-            self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {self.__solver_range[0]:0.2f} to {working_range[1]:0.2f} m/s\n"
+            self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {self.speed_range[0]:0.2f} to {working_range[1]:0.2f} m/s\n"
             solution = None
         else:
             # bruteforce solver
@@ -296,7 +297,7 @@ class Polar:
         initial_guess = ureg('50.0 knots').to(ureg.mps).magnitude
 
         # For each MC value, find the speed at which "goal_function" is equal to zero
-        solver_range = self.__solver_range
+        solver_range = self.speed_range
         for i in range(len(mcTable)):
             mc = mcTable[i]
             v = self.normal_solver(initial_guess, mc.magnitude)
@@ -320,8 +321,8 @@ class Polar:
             else:
                 Vstf[i] = v
                 Vavg[i] = self.v_avg(v, mc.magnitude)
-                S = self.Sink(v)
-                LD[i] = v / (-S) # L/D is dimensionless
+                S = self.sink(v) - self.__v_air_vert
+                LD[i] = v / (-S)
                 solver_result[i] = self.goal_function(v, mc.magnitude)
                 initial_guess = v
                  
