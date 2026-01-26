@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 import numpy as np
 import dash
@@ -23,7 +23,6 @@ import logging
 # Get access to the one-and-only UnitsRegistry instance
 from units import ureg
 PA_ = pint_pandas.PintArray
-Q_ = ureg.Quantity
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(name)s: %(message)s')
 
@@ -66,14 +65,22 @@ def get_cached_glider(glider_name, current_glider_info):
     return _glider_cache[glider_name]
 
 def load_polar(current_glider:glider.Glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
-    current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
-    speed, _ = current_glider.polar_data_magnitude()
-
-    # Evaluate the polynomial for new points
-    speed = np.linspace(min(speed), max(speed), 100)
-    dfFit = pd.DataFrame({'Speed': PA_(speed, ureg.mps), 'Sink': PA_(current_polar.Sink(speed), ureg.mps)})
+    """
+    Create a Polar model for the given glider configured with the specified fit degree, goal function, airmass speeds, and pilot weight.
     
-    return dfFit, current_polar
+    Parameters:
+        current_glider (glider.Glider): Glider definition and performance data to build the polar from.
+        degree (int): Polynomial degree used to fit the polar curve (must be >= 2).
+        goal_function (str): Identifier of the optimization goal used when constructing the polar (e.g., 'Reichmann', 'Test').
+        v_air_horiz (float): Horizontal airmass speed to apply to the polar, in meters per second.
+        v_air_vert (float): Vertical airmass (sink or lift) speed to apply to the polar, in meters per second.
+        pilot_weight (float | pint.Quantity): Pilot weight to include in the polar; may be a plain number (assumed kilograms) or a quantity with units.
+    
+    Returns:
+        polar_calc.Polar: A Polar object representing the fitted polar model for the provided glider and conditions.
+    """
+    current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
+    return current_polar
 
 # dummy data to setup the AG Grid as a MacCready table
 initial_data = pd.DataFrame({'MC': [0], 'STF': [0], 'Vavg': [0], 'L/D': [0]})
@@ -413,30 +420,28 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
 )
 def update_graph(data, degree, glider_name, maccready, goal_function, show_debug_graphs, write_excel_file, units,):
     """
-    Update the UI graphs, MacCready table, and related display values based on the current inputs.
-    
-    Updates the polar and speed-to-fly figures, computes MacCready table rows (converted to the selected units), optionally appends STF results to an Excel file, and returns all UI outputs required by the Dash callback.
+    Update the polar and Speed-to-Fly graphs, compute MacCready table rows in the selected units, and produce all Dash callback outputs for the UI.
     
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        degree: Polynomial degree to fit the polar (treated as minimum 2 if lower or None).
-        glider_name: Name of the selected glider as present in the glider info dataset.
-        maccready: MacCready setting value in the currently selected sink units (0 if None).
-        goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
-        show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
-        write_excel_file: If true, collect STF columns and save them to an Excel file named "<glider> stf.xlsx".
-        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
+        data (dict): Stored user values; may contain 'pilot_weight' (kg), 'v_air_horiz' (m/s), and 'v_air_vert' (m/s).
+        degree (int|None): Polynomial degree to fit the polar; treated as at least 2 if lower or None.
+        glider_name (str|None): Selected glider name; defaults to the application default when falsy.
+        maccready (float|None): MacCready setting expressed in the currently selected sink units; treated as 0.0 if None.
+        goal_function (str): Identifier of the solver goal function passed to the polar model.
+        show_debug_graphs (bool): If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
+        write_excel_file (bool): If true, append STF results for the current degree to an Excel file named "<glider> stf.xlsx".
+        units (str): Unit system key, either 'Metric' or 'US', used to select display units for speed, sink, and weight.
     
     Returns:
-        tuple: An 8-item tuple matching the Dash callback outputs in order:
-            - Displayed glider name (str)
-            - Status/statistics messages from the polar model (str)
-            - Polar plot figure (plotly.graph_objs.Figure)
+        tuple: Eight items matching the Dash outputs in order:
+            - displayed glider name (str)
+            - status and informational messages from the polar model (str)
+            - polar plot figure (plotly.graph_objs.Figure)
             - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
-            - MacCready table row data as list of dicts
-            - Column definitions for the MacCready AG Grid (list[dict])
-            - Column sizing mode for the AG Grid (str)
-            - Effective polynomial degree used (int)
+            - MacCready table rows as a list of dicts (records)
+            - AG Grid column definitions for the MacCready table (list[dict])
+            - AG Grid column sizing mode (str), e.g. "sizeToFit"
+            - effective polynomial degree actually used (int)
     """
     global df_out
 
@@ -485,7 +490,7 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     degree = max(degree, 2)
 
     # Get a polynomial fit to the polar curve data
-    df_fit, current_polar = load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
+    current_polar:polar_calc.Polar = load_polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
     weight_factor = current_polar.get_weight_factor()
 
     # Graph the polar data
@@ -497,15 +502,20 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     polar_graph.add_trace(trace_data)
 
     # Graph the fit to the data on the same graph
-    trace_fit = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude,
-                        y=df_fit['Sink'].pint.to(sink_units).pint.magnitude,
-                        name=f"Fit, degree={degree}")
+    # Evaluate the polynomial for new points
+    r = current_polar.speed_range
+    speed_mps_magnitude = np.linspace(r[0], r[1], 100)
+    speed = (speed_mps_magnitude * ureg('m/s')).to(speed_units).magnitude
+    sink = (current_polar.sink(speed_mps_magnitude, weight_correction=False, include_airmass=False)*ureg('m/s')).to(sink_units).magnitude
+    trace_fit = go.Scatter(x=speed,
+                           y=sink,
+                           name=f"Fit, degree={degree}")
     polar_graph.add_trace(trace_fit)
 
     if show_debug_graphs:
         # Graph the residuals (difference between the data and the fit)
         speed_data = current_glider.get_speed_data().to(speed_units)
-        sink_fit = current_polar.Sink(current_glider.get_speed_data().magnitude)
+        sink_fit = current_polar.sink(current_glider.get_speed_data().magnitude, weight_correction=False, include_airmass=False)
         resid = current_glider.get_sink_data().to(sink_units) - (sink_fit * ureg('m/s')).to(sink_units)
         trace_residuals = go.Scatter(x=speed_data.magnitude,
                             y=resid.magnitude,
@@ -513,12 +523,22 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
         polar_graph.add_trace(trace_residuals, secondary_y=True)
 
     # Add the weight-adjusted polar, but only if the all-up weight differs from the reference weight
-    if (weight_factor != 1.0):
-        trace_weight_adjusted = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude * weight_factor,
-                            y=df_fit['Sink'].pint.to(sink_units).pint.magnitude * weight_factor,
+    if (weight_factor != 1.0 or v_air_vert != 0.0):
+        # sink = (current_polar.sink(speed_mps_magnitude, weight_correction=True, include_airmass=False)*ureg('m/s')).to(sink_units).magnitude
+        trace_weight_adjusted = go.Scatter(x=speed * weight_factor,
+                            y=sink * weight_factor,
                             name=f"Adjusted to {current_polar.get_weight_fly().to(weight_units).magnitude:.1f} {weight_units.units:~P}")
         polar_graph.add_trace(trace_weight_adjusted)
-
+    """
+    # Alternate adjustment: Add the weight-adjusted polar, but only if the all-up weight differs from the reference weight
+    if (weight_factor != 1.0 or v_air_vert != 0.0):
+        sink = (current_polar.sink(speed_mps_magnitude, weight_correction=True, include_airmass=False)*ureg('m/s')).to(sink_units).magnitude
+        trace_weight_adjusted = go.Scatter(
+            x=speed,
+            y=sink,
+            name=f"Alternate adjustment")
+        polar_graph.add_trace(trace_weight_adjusted)
+    """
     polar_graph.update_layout(
         xaxis_title=f"Speed ({speed_units.units:~P})",
         yaxis_title=f"Sink ({sink_units.units:~P})",
@@ -547,14 +567,14 @@ def update_graph(data, degree, glider_name, maccready, goal_function, show_debug
     # MacCready values for table, zero to 10 knots, but must be converted to m/s
     mc_table =  (np.arange(start=0.0, stop=10.01, step=0.02) * ureg.knots).to('m/s')
     df_mc = current_polar.MacCready(mc_table)
-    v =df_fit['Speed'].pint.magnitude
+    # v =df_fit['Speed'].pint.magnitude
 
     if show_debug_graphs:
-        goal_function_values = current_polar.goal_function(v, maccready.magnitude)
+        goal_function_values = current_polar.goal_function(speed_mps_magnitude, maccready.magnitude)
         goal_function_values[(goal_function_values >= 10) | (goal_function_values <= -10)] = np.nan
-        trace_goal = go.Scatter(x=df_fit['Speed'].pint.to(speed_units).pint.magnitude,
-                            y=goal_function_values,
-                            name='Goal Function',)
+        trace_goal = go.Scatter(x=speed,
+                                y=goal_function_values,
+                                name='Goal Function',)
         polar_graph.add_trace(trace_goal)
 
     stf_graph = make_subplots(specs=[[{"secondary_y": True}]])

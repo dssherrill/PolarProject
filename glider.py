@@ -13,7 +13,6 @@ import pint_pandas
 # Get access to the one-and-only UnitsRegistry instance
 from units import ureg
 PA_ = pint_pandas.PintArray
-Q_ = ureg.Quantity
 logger = logging.getLogger(__name__)
 
 class Glider:
