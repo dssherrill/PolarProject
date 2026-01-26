@@ -3,6 +3,7 @@ import pandas as pd
 
 from numpy.polynomial import Polynomial as Poly
 from scipy.optimize import fsolve
+from scipy.optimize import root_scalar
 from scipy import stats
 
 import pint
@@ -57,7 +58,7 @@ class Polar:
             self.__messages += msg + "\n"
             self.__weight_factor = 1.0
         else:
-            self.__weight_factor = np.sqrt(self.__weight_fly/current_glider.referenceWeight())
+            self.__weight_factor = np.sqrt(self.__weight_fly.magnitude/current_glider.referenceWeight().magnitude)
 
         self.fit_polar(degree)
 
@@ -111,11 +112,11 @@ class Polar:
         Returns:
             float: Sink rate in meters per second (negative values indicate climb, positive values indicate descent).
         """
-        w = self.__weight_factor.magnitude
+        w = self.__weight_factor
         return w * self.__sink_poly(v/w) + self.__v_air_vert
 
     def sink_deriv(self, v):
-        w = self.__weight_factor.magnitude
+        w = self.__weight_factor
         return self.__sink_deriv_poly(v/w)
 
     # Average cross-country speed accounting for thermalling time
@@ -124,7 +125,7 @@ class Polar:
         x = self.__v_air_horiz
         f = 1.0
         s = self.sink(v)
-        return (mc*(v+x) - f*x*s)/(mc - s)
+        return (mc*(v+x) - f*x*s)/(mc - s) 
 
     def goal_function_1(self, v, mc):
         # Reichmann STF equation (Equation II) after moving left-hand-side to right-hand-side
@@ -184,6 +185,8 @@ class Polar:
         """
         self.__degree = degree        
         speed, sink = self.__glider.polar_data_magnitude()
+        self.__solver_range = (min(speed), max(speed))
+        logger.debug(f'Fitting polar of degree {degree} over speed range {self.__solver_range[0]:.3f} to {self.__solver_range[1]:.3f} m/s')
 
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
@@ -217,11 +220,61 @@ class Polar:
         MSE = SSE_val / n_data_points
         self.__messages += f"MSE = {MSE:.3}"
 
+        logger.info(f'{self.__messages}')
+
     def Sink(self, speed):
         return self.__sink_poly(speed)
+    
+    def normal_solver(self, initial_guess, mc):
+        [sol, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6)
+        if err == 1:
+            solution = sol[0]
 
+            if len(sol) > 1:
+                self.__messages += f'{mc=} m/s, {solution=}, found {len(sol)} solutions\n'
+        else:
+            # fsolve did not find a solution
+            solution = None
+        
+        return solution
+    
+    def bruteforce_solver(self, initial_guess, mc):
+        # First, find a workable range
+        working_range = (initial_guess, self.__solver_range[1])
+        r0_val = self.goal_function(working_range[0], mc)
+        r1_val = self.goal_function(working_range[1], mc)
+        solution = None
+        if r0_val * r1_val > 0:
+            # goal function has same sign at both ends of range
+            # Brute force search for a better range
+            logger.debug(f'Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})')
+            r0 = working_range[0]
+            for r1 in np.arange(working_range[0], 1.5 * self.__solver_range[1], 5.0):
+                r1_val = self.goal_function(r1, mc)
+                if r0_val * r1_val < 0:
+                    working_range = (r0, r1)
+                    logger.debug(f'New range: ({working_range[0]}, {working_range[1]}) = ({r0_val:.6f}, {r1_val:.6f})')
+                    break
+                r0 = r1
+                r0_val = r1_val
+
+        if r0_val * r1_val > 0:
+            self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {self.__solver_range[0]:0.2f} to {working_range[1]:0.2f} m/s\n"
+            solution = None
+        else:
+            # bruteforce solver
+            sol = root_scalar(self.goal_function, bracket=working_range, args=(mc,), method='brentq', xtol=1.0e-6)
+            solution = sol.root if sol.converged else None
+        return solution
+
+        """
+        Find the speed-to-fly that optimizes performance for each value in a sequence of MacCready settings.
+        Parameters:
+            mc (float): MacCready setting (m/s).
+        """
     # mcTable has MacCready values in units of m/s
     def MacCready(self, mcTable):
+
         """
         Compute MacCready performance table for a sequence of MacCready values.
         
@@ -236,6 +289,7 @@ class Polar:
                 - L/D: Lift-to-drag ratio at the STF (dimensionless)
                 - solverResult: Solver residual or goal-function value for the found STF
         """
+    
         Vstf = np.zeros(len(mcTable))   # optimum speed-to-fly
         Vavg = np.zeros(len(mcTable))   # net cross-country speed, taking thermalling time into account
         LD = np.zeros(len(mcTable))     # L/D ratio at Vstf
@@ -245,29 +299,35 @@ class Polar:
         initial_guess = ureg('50.0 knots').to(ureg.mps).magnitude
 
         # For each MC value, find the speed at which "goal_function" is equal to zero
+        solver_range = self.__solver_range
         for i in range(len(mcTable)):
             mc = mcTable[i]
-            [solution, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc.magnitude), full_output=True, xtol=0.01)
-            if err == 1:
-                v = solution[0]
-                Vstf[i] = v
+            v = self.normal_solver(initial_guess, mc.magnitude)
 
-                # Reichmann: Vcruise = V * Cl / (Cl - Si); Cl = climb rate (positive); Si = sink rate (negative)
-                if len(solution) > 1:
-                    self.__messages += f'{i=}, {v=}, {len(solution)=}\n'
-
-                sink = self.sink(v)
-                LD[i] = -v / sink # negative sign because sink in negative by L/D is always express as positive
-#                Vavg[i] = (v * mc.magnitude / (mc.magnitude - sink))
-                Vavg[i] = self.v_avg(v, mc.magnitude)
-                solver_result[i] = self.goal_function(v, mc.magnitude,)
-
-                # Use this solution as the initial guess for the next v value 
-                initial_guess = v
+            if v is None:
+                logger.debug(f'Normal solver failed for MC={mc:.3f} m/s; trying bruteforce solver')
+                v = self.bruteforce_solver(initial_guess, mc.magnitude)
             else:
-                self.__messages += f"\nSolution not found for index {i}, MC = {mc:0.3f} m/s\n"
-                self.__messages += f"Reason: {msg}\n"
-                
+                # Check that a solution > slowest speed was found
+                if v < solver_range[0]:
+                    logger.debug(f'Normal solver returned out-of-range solution v={v:.3f} m/s for MC={mc:.3f} m/s; trying bruteforce solver')
+                    v = self.bruteforce_solver(initial_guess, mc.magnitude) 
+            
+            if v is None:
+                Vstf[i] = float('nan')   # no solution found
+                Vavg[i] = float('nan')
+                LD[i] = float('nan')
+                solver_result[i] = float('nan')
+                self.__messages += f'No solution found for MC = {mc:.3f} m/s\n'
+                logger.debug(f'No solution found for MC={mc:.3f} m/s')
+            else:
+                Vstf[i] = v
+                Vavg[i] = self.v_avg(v, mc.magnitude)
+                S = self.Sink(v)
+                LD[i] = v / (-S) # L/D is dimensionless
+                solver_result[i] = self.goal_function(v, mc.magnitude)
+                initial_guess = v
+                 
         df_mc = pd.DataFrame({'MC':  PA_(mcTable, ureg.mps),
                             'STF':  PA_(Vstf, ureg.mps),
                             'Vavg': PA_(Vavg, ureg.mps),
