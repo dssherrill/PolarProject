@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 import numpy as np
 import dash
@@ -65,6 +65,20 @@ def get_cached_glider(glider_name, current_glider_info):
     return _glider_cache[glider_name]
 
 def load_polar(current_glider:glider.Glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight):
+    """
+    Create a Polar model for the given glider configured with the specified fit degree, goal function, airmass speeds, and pilot weight.
+    
+    Parameters:
+        current_glider (glider.Glider): Glider definition and performance data to build the polar from.
+        degree (int): Polynomial degree used to fit the polar curve (must be >= 2).
+        goal_function (str): Identifier of the optimization goal used when constructing the polar (e.g., 'Reichmann', 'Test').
+        v_air_horiz (float): Horizontal airmass speed to apply to the polar, in meters per second.
+        v_air_vert (float): Vertical airmass (sink or lift) speed to apply to the polar, in meters per second.
+        pilot_weight (float | pint.Quantity): Pilot weight to include in the polar; may be a plain number (assumed kilograms) or a quantity with units.
+    
+    Returns:
+        polar_calc.Polar: A Polar object representing the fitted polar model for the provided glider and conditions.
+    """
     current_polar = polar_calc.Polar(current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight)
     return current_polar
 
@@ -406,30 +420,28 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
 )
 def update_graph(data, degree, glider_name, maccready, goal_function, show_debug_graphs, write_excel_file, units,):
     """
-    Update the UI graphs, MacCready table, and related display values based on the current inputs.
-    
-    Updates the polar and speed-to-fly figures, computes MacCready table rows (converted to the selected units), optionally appends STF results to an Excel file, and returns all UI outputs required by the Dash callback.
+    Update the polar and Speed-to-Fly graphs, compute MacCready table rows in the selected units, and produce all Dash callback outputs for the UI.
     
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        degree: Polynomial degree to fit the polar (treated as minimum 2 if lower or None).
-        glider_name: Name of the selected glider as present in the glider info dataset.
-        maccready: MacCready setting value in the currently selected sink units (0 if None).
-        goal_function: Identifier of the solver goal function used when fitting/solving (passed to polar model).
-        show_debug_graphs: If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
-        write_excel_file: If true, collect STF columns and save them to an Excel file named "<glider> stf.xlsx".
-        units: Unit system key ('Metric' or 'US') determining speed, sink, and weight display units.
+        data (dict): Stored user values; may contain 'pilot_weight' (kg), 'v_air_horiz' (m/s), and 'v_air_vert' (m/s).
+        degree (int|None): Polynomial degree to fit the polar; treated as at least 2 if lower or None.
+        glider_name (str|None): Selected glider name; defaults to the application default when falsy.
+        maccready (float|None): MacCready setting expressed in the currently selected sink units; treated as 0.0 if None.
+        goal_function (str): Identifier of the solver goal function passed to the polar model.
+        show_debug_graphs (bool): If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
+        write_excel_file (bool): If true, append STF results for the current degree to an Excel file named "<glider> stf.xlsx".
+        units (str): Unit system key, either 'Metric' or 'US', used to select display units for speed, sink, and weight.
     
     Returns:
-        tuple: An 8-item tuple matching the Dash callback outputs in order:
-            - Displayed glider name (str)
-            - Status/statistics messages from the polar model (str)
-            - Polar plot figure (plotly.graph_objs.Figure)
+        tuple: Eight items matching the Dash outputs in order:
+            - displayed glider name (str)
+            - status and informational messages from the polar model (str)
+            - polar plot figure (plotly.graph_objs.Figure)
             - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
-            - MacCready table row data as list of dicts
-            - Column definitions for the MacCready AG Grid (list[dict])
-            - Column sizing mode for the AG Grid (str)
-            - Effective polynomial degree used (int)
+            - MacCready table rows as a list of dicts (records)
+            - AG Grid column definitions for the MacCready table (list[dict])
+            - AG Grid column sizing mode (str), e.g. "sizeToFit"
+            - effective polynomial degree actually used (int)
     """
     global df_out
 
