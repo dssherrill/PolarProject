@@ -226,12 +226,9 @@ class Polar:
         return self.__sink_poly(speed)
     
     def normal_solver(self, initial_guess, mc):
-        [sol, _, err, msg] = fsolve(self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6)
+        [sol, _, err, _msg] = fsolve(self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6)
         if err == 1:
             solution = sol[0]
-
-            if len(sol) > 1:
-                self.__messages += f'{mc=} m/s, {solution=}, found {len(sol)} solutions\n'
         else:
             # fsolve did not find a solution
             solution = None
