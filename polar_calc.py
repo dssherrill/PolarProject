@@ -103,15 +103,15 @@ class Polar:
             
     def sink(self, v, weight_correction=True, include_airmass=True):
         """
-        Compute the glider's sink rate at a given true airspeed, scaled for the configured weight and adjusted by the ambient vertical airspeed.
+        Evaluate the glider's sink rate at a given true airspeed, optionally applying the configured weight scaling and ambient vertical-air adjustment.
         
         Parameters:
-            v (float): True airspeed at which to evaluate the polar, in meters per second.
-            weight_correction (bool): If True, scale the sink rate by the weight factor; if False, return unscaled sink rate.
-            include_airmass (bool): If True, add the configured vertical air mass movement to the sink rate; if False, return sink rate without air mass adjustment.
+            v (float): True airspeed in meters per second.
+            weight_correction (bool): If True, scale the sink rate by the configured weight factor; if False, use the unscaled polar.
+            include_airmass (bool): If True, add the configured ambient vertical airspeed (positive = descent) to the sink rate; if False, omit ambient vertical motion.
         
         Returns:
-            float: Sink rate in meters per second (negative values indicate climb, positive values indicate descent).
+            float: Sink rate in meters per second; negative values indicate climb, positive values indicate descent.
         """
         w = self.__weight_factor if weight_correction else 1.0
         s = w * self.__sink_poly(v/w) 
@@ -120,6 +120,15 @@ class Polar:
         return s
     
     def sink_deriv(self, v):
+        """
+        Compute the derivative of the fitted sink-rate polynomial with respect to true airspeed, applying the configured weight scaling.
+        
+        Parameters:
+            v: True airspeed at which to evaluate the derivative.
+        
+        Returns:
+            The derivative of sink rate with respect to true airspeed evaluated at v (change in sink per unit speed), with the instance weight factor applied.
+        """
         w = self.__weight_factor
         return self.__sink_deriv_poly(v/w)
 
@@ -180,9 +189,9 @@ class Polar:
     # degree: the degree (order) of the polynomial to use
     def fit_polar(self, degree):
         """
-        Fit the polar sink-rate data to a polynomial and record fit-quality metrics.
+        Fit the polar sink-rate data with a polynomial and record fit-quality metrics.
         
-        Fits the instance's loaded speed and sink data to a polynomial of the given degree. For degree == 2 the fit starts at the speed corresponding to the minimum sink; otherwise the full dataset is used. The fitted polynomial and its derivative are stored on the instance, and the method computes predicted sink values to derive and append R^2 and mean squared error (MSE) information to the instance message log.
+        Stores the fitted polynomial and its derivative on the instance, sets the fitted degree and speed_range, and appends goodness-of-fit information (R^2 and mean squared error) to the instance message log. For degree == 2 the fit excludes speeds below the speed at minimum sink to avoid poor curvature near the stall; for other degrees the full dataset is used.
         
         Parameters:
             degree (int): Polynomial degree to fit to the sink-rate data.
@@ -227,6 +236,16 @@ class Polar:
         logger.info(f'{self.__messages}')
 
     def normal_solver(self, initial_guess, mc):
+        """
+        Find a root of the configured goal function starting from an initial guess.
+        
+        Parameters:
+            initial_guess (float): Initial speed guess in meters per second.
+            mc (pint.Quantity or float): MacCready setting (magnitude) passed to the goal function.
+        
+        Returns:
+            solution (float or None): Root speed in meters per second when a solution is found; `None` if the solver fails to converge.
+        """
         [sol, _, err, _msg] = fsolve(self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6)
         if err == 1:
             solution = sol[0]
@@ -238,6 +257,16 @@ class Polar:
     
     def bruteforce_solver(self, initial_guess, mc):
         # First, find a workable range
+        """
+        Finds a root of the configured goal function for a given MacCready setting by searching for a bracketing interval and applying a Brent solver.
+        
+        Parameters:
+            initial_guess (float): Starting airspeed (m/s) used as the lower bound when searching for a sign change.
+            mc (float): MacCready setting (m/s) to pass to the goal function.
+        
+        Returns:
+            float or None: The speed (m/s) at which the goal function is zero if found and converged; `None` if no valid bracket is located or the solver fails to converge. 
+        """
         working_range = (initial_guess, self.speed_range[1])
         r0_val = self.goal_function(working_range[0], mc)
         r1_val = self.goal_function(working_range[1], mc)
@@ -274,18 +303,18 @@ class Polar:
     def MacCready(self, mcTable):
 
         """
-        Compute MacCready performance table for a sequence of MacCready values.
+        Compute a MacCready performance table for a sequence of MacCready settings.
         
         Parameters:
-            mcTable (array-like of pint.Quantity): Sequence of MacCready settings (values in meters per second).
+            mcTable (array-like of pint.Quantity): Sequence of MacCready values with units of meters per second.
         
         Returns:
-            pandas.DataFrame: DataFrame with columns
-                - MC: MacCready values as quantities in m/s
-                - STF: Optimal speed-to-fly at each MC as quantities in m/s
-                - Vavg: Net cross-country average speed (accounts for thermalling) as quantities in m/s
+            pandas.DataFrame: Table with columns
+                - MC: MacCready settings as pint quantities in m/s
+                - STF: Optimal speed-to-fly (STF) for each MC as pint quantities in m/s
+                - Vavg: Net cross-country average speed (accounts for thermalling) as pint quantities in m/s
                 - L/D: Lift-to-drag ratio at the STF (dimensionless)
-                - solverResult: Solver residual or goal-function value for the found STF
+                - solverResult: Value of the goal-function (solver residual) at the found STF
         """
     
         Vstf = np.zeros(len(mcTable))   # optimum speed-to-fly
