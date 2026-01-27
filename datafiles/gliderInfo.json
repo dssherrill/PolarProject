@@ -1,5 +1,5 @@
 [
-    {
+        {
         "name":"ASK 21",
         "polarFileName":"ASK 21.csv",
         "speedUnits":"kph",
@@ -33,8 +33,19 @@
         "fitEnd":200
     },
     {
-        "name":"JS3 JET",
-        "polarFileName":"JS3 JET.csv",
+        "name":"JS3 JET 15m",
+        "polarFileName":"JS3 JET 15m.csv",
+        "speedUnits":"kph",
+        "sinkUnits":"m\/s",
+        "weightUnits":"kg",
+        "referenceWeight":525.0,
+        "emptyWeight": 318,
+        "fitStart":50,
+        "fitEnd":200
+    },
+    {
+        "name":"JS3 JET 18m",
+        "polarFileName":"JS3 JET 18m.csv",
         "speedUnits":"kph",
         "sinkUnits":"m\/s",
         "weightUnits":"kg",

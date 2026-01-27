@@ -332,12 +332,12 @@ class Polar:
             v = self.normal_solver(initial_guess, mc.magnitude)
 
             if v is None:
-                logger.debug(f'Normal solver failed for MC={mc:.3f} m/s; trying bruteforce solver')
+                logger.debug(f'Normal solver failed for MC={mc:.3f~P}; trying bruteforce solver')
                 v = self.bruteforce_solver(initial_guess, mc.magnitude)
             else:
                 # Check that a solution > slowest speed was found
                 if v < solver_range[0]:
-                    logger.debug(f'Normal solver returned out-of-range solution v={v:.3f} m/s for MC={mc:.3f} m/s; trying bruteforce solver')
+                    logger.debug(f'Normal solver returned out-of-range solution v={v:.3f} m/s for MC={mc:.3f~P}; trying bruteforce solver')
                     v = self.bruteforce_solver(initial_guess, mc.magnitude) 
             
             if v is None:
@@ -345,8 +345,8 @@ class Polar:
                 Vavg[i] = float('nan')
                 LD[i] = float('nan')
                 solver_result[i] = float('nan')
-                self.__messages += f'No solution found for MC = {mc:.3f} m/s\n'
-                logger.debug(f'No solution found for MC={mc:.3f} m/s')
+                self.__messages += f'No solution found for MC = {mc:.3f~P}\n'
+                logger.debug(f'No solution found for MC={mc:.3f~P}')
             else:
                 Vstf[i] = v
                 Vavg[i] = self.v_avg(v, mc.magnitude)

@@ -123,7 +123,7 @@ Use `pint_*_demo.py` files for unit/dataframe examples (exploration scripts, not
 - **Weight factor applies non-linearly**: Affects both sink rate and all derived metrics.
 - **CSV format strict**: Speed (col 1, kph), Sink (col 2, m/s). No header row.
 - **Goal functions differ**: Reichmann minimizes time to reach a goal; "Mine" maximizes average speed accounting for wind.
-- **fsolve() initial guess matters**: Currently 80 knots; may need adjustment for edge cases.
+- **fsolve() initial guess matters**: Currently 50 knots; may need adjustment for edge cases.
 
 ## File Structure Notes
 
