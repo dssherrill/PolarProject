@@ -42,11 +42,11 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 DEFAULT_POLYNOMIAL_DEGREE = 5
 
 # display options
-METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg')}
-US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs')}
+METRIC_UNITS = {'Speed': ureg('kph'), 'Sink': ureg('m/s'), 'Weight': ureg('kg'), 'Wing Area': ureg('m**2'), 'Pressure': ureg('kg/m**2')}
+US_UNITS = {'Speed': ureg('knots'), 'Sink': ureg('knots'), 'Weight': ureg('lbs'), 'Wing Area': ureg('ft**2'), 'Pressure': ureg('lbs/ft**2')}
 UNIT_CHOICES = {'Metric' : METRIC_UNITS, 'US' : US_UNITS}
 
-def get_cached_glider(glider_name, current_glider_info):
+def get_cached_glider(glider_name, current_glider_info) -> glider.Glider:
     """
     Get or create a cached Glider instance to avoid duplicate CSV parsing.
     
@@ -155,6 +155,11 @@ app.layout = dbc.Container([
                     dbc.Label("Pilot + Ballast weight (kg):", html_for="pilot-weight-input", id="pilot-weight-label"),
                     dcc.Input(id="pilot-weight-input", type="number", placeholder="100", ), # , debounce=True),
                     ]),
+
+                #--- wing area
+                    dbc.Label("Wing Area:", html_for="wing-area-input", id="wing-area-label"),
+                    dcc.Input(id="wing-area-input", type="number", placeholder="0", readOnly=True), # , debounce=True),
+
                 ], className="mb-3"),
 
             dbc.Row([
@@ -301,6 +306,7 @@ app.layout = dbc.Container([
     Output(component_id='vertical-speed-label', component_property='children'),
     Output(component_id='ref-weight-input', component_property='placeholder'),
     Output(component_id='empty-weight-input', component_property='placeholder'),
+    Output(component_id='wing-area-input', component_property='placeholder'),
     Output(component_id='pilot-weight-input', component_property='placeholder'),
     Output(component_id='pilot-weight-input', component_property='value'),
     Output(component_id='airmass-horizontal-speed', component_property='value'),
@@ -380,6 +386,7 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
 
     reference_weight = current_glider.referenceWeight().to(selected_units['Weight']).magnitude
     empty_weight = current_glider.emptyWeight().to(selected_units['Weight']).magnitude
+    wing_area = current_glider.wingArea().to(selected_units['Wing Area'])
 
     reference_pilot_weight = reference_weight - empty_weight 
 
@@ -390,6 +397,7 @@ def process_unit_change(units, glider_name, pilot_weight_in, v_air_horiz_in, v_a
             f"Vertical speed ({selected_units['Sink'].units:~P}):", 
             f"{reference_weight:.1f}",
             f"{empty_weight:.1f}",
+            f"{wing_area:.1f~P}",
             f"{reference_pilot_weight:.1f}",
             f"{(pilot_weight * ureg('kg')).to(selected_units['Weight']).magnitude:.1f}" if pilot_weight is not None else None,
             f"{(v_air_horiz * ureg('m/s')).to(speed_units).magnitude:.1f}" if v_air_horiz is not None else None,

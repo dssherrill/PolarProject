@@ -23,14 +23,14 @@ class Glider:
         self.__messages = ""
 
         # Get units from the passed DataFrame
-        speed_units = ureg(current_glider['speedUnits'].iloc[0])
-        sink_units = ureg(current_glider['sinkUnits'].iloc[0])  
-        weight_units = ureg(current_glider['weightUnits'].iloc[0])
+        speed_units = ureg(current_glider['polarSpeedUnits'].iloc[0])
+        sink_units = ureg(current_glider['polarSinkUnits'].iloc[0])  
 
         # Get glider data from the passed DataFrame
         self.__name = current_glider['name'].iloc[0]
-        self.__ref_weight = (current_glider['referenceWeight'].iloc[0] * weight_units).to('kg')
-        self.__empty_weight = (current_glider['emptyWeight'].iloc[0] * weight_units).to('kg')
+        self.__ref_weight = ureg(current_glider['referenceWeight'].iloc[0]).to('kg')
+        self.__empty_weight = ureg(current_glider['emptyWeight'].iloc[0]).to('kg')
+        self.__wing_area = ureg(current_glider['wingArea'].iloc[0]).to('m**2')
 
         # Load the polar data from the CSV file
         self.load_CSV(current_glider, speed_units, sink_units)
@@ -108,6 +108,9 @@ class Glider:
     
     def emptyWeight(self):
         return self.__empty_weight
+    
+    def wingArea(self):
+        return self.__wing_area
     
     def messages(self):
         """
