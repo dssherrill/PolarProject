@@ -30,25 +30,26 @@ class Polar:
         pilot_weight=None,
     ):
         """
-        Create a Polar model configured from a glider dataset and flight conditions.
-
+        Initialize a Polar model from a glider dataset and flight conditions.
+        
+        Configures the instance with the provided glider record, goal selection, and airspeed
+        components; computes the flight weight and a weight-scaling factor, records status
+        messages, and fits the polar sink-rate polynomial.
+        
         Parameters:
-            current_glider (pandas.DataFrame): Glider record containing at least the keys
-                'referenceWeight', 'emptyWeight', and 'polarFileName' in its first row.
-            degree (int): Polynomial degree to use when fitting the polar sink-rate curve.
-            goal (str): Goal selection identifier used by goal_function (e.g., 'Reichmann', 'Test').
-            v_air_horiz: Horizontal component of airspeed (units/quantity expected by the caller).
-            v_air_vert: Vertical component of airspeed (units/quantity expected by the caller).
-            pilot_weight (optional): Pilot weight to use in flight weight calculation. If omitted,
-                the reference weight from current_glider is used; if provided, flight weight is
-                computed as empty weight plus pilot_weight.
-
+            current_glider (glider.Glider): Glider record providing reference and empty weights
+                and polar data accessors.
+            degree (int): Polynomial degree to use when fitting the sink-rate (polar) curve.
+            goal (str): Goal selector used by the instance's goal_function (e.g., "Reichmann", "Test").
+            v_air_horiz: Horizontal component of ambient airspeed (quantity expected by caller).
+            v_air_vert: Vertical component of ambient airspeed (quantity expected by caller).
+            pilot_weight (optional): Pilot weight to add to empty weight (quantity with units,
+                if omitted the glider's reference weight is used).
+        
         Side effects:
-            - Stores configuration and computed values (reference/empty weight, flight weight,
-              weight factor, goal selection, airspeed components) on the instance.
-            - Initializes an internal messages string.
-            - Loads polar data from the CSV referenced by current_glider and fits the polar
-              polynomial using the specified degree.
+            - Stores configuration and computed weight/weight-factor on the instance.
+            - Appends status messages to the instance message log.
+            - Calls fit_polar(degree) to load and fit the polar data.
         """
         self.__glider = current_glider
         self.__goal_selection = goal
@@ -79,10 +80,10 @@ class Polar:
 
     def messages(self):
         """
-        Return the accumulated status and error messages recorded by this Polar instance.
-
+        Get accumulated status and error messages for this Polar instance.
+        
         Returns:
-            str: Concatenated message string collected during operations (may be empty).
+            str: Concatenated message string collected during operations; empty string if no messages.
         """
         return self.__messages
 
@@ -90,9 +91,21 @@ class Polar:
     #     return self.__ref_weight - self.__empty_weight
 
     def get_weight_fly(self):
+        """
+        Return the computed flight weight used for performance calculations.
+        
+        Returns:
+            The flight weight (includes glider empty weight plus pilot weight when provided) as a pint quantity with units of kilograms.
+        """
         return self.__weight_fly
 
     def get_weight_factor(self):
+        """
+        Provide the dimensionless weight-scaling factor applied to the polar.
+        
+        Returns:
+            float: Weight factor (greater than 0) used to scale speeds and sink rates, computed as sqrt(flight weight / reference weight).
+        """
         return self.__weight_factor
 
     def goal_function(self, v, mc):
@@ -139,13 +152,13 @@ class Polar:
 
     def sink_deriv(self, v):
         """
-        Compute the derivative of the fitted sink-rate polynomial with respect to true airspeed, applying the configured weight scaling.
-
+        Evaluate the derivative of the fitted sink-rate polynomial with respect to true airspeed, applying the instance weight factor.
+        
         Parameters:
-            v: True airspeed at which to evaluate the derivative.
-
+            v: True airspeed at which to evaluate the derivative (speed quantity).
+        
         Returns:
-            The derivative of sink rate with respect to true airspeed evaluated at v (change in sink per unit speed), with the instance weight factor applied.
+            The derivative of sink rate with respect to true airspeed at `v`, with the configured weight scaling applied (sink change per unit speed).
         """
         w = self.__weight_factor
         return self.__sink_deriv_poly(v / w)
@@ -153,6 +166,16 @@ class Polar:
     # Average cross-country speed accounting for thermalling time
     # using Eq (2) from the included document "MacCready Speed to Fly Theory.pdf"
     def v_avg(self, v, mc):
+        """
+        Compute the net cross-country average speed accounting for thermalling time.
+        
+        Parameters:
+            v (Quantity or float): True airspeed at which to evaluate average speed.
+            mc (Quantity or float): MacCready setting (expected vertical speed).
+        
+        Returns:
+            Vavg (Quantity or float): Net cross-country speed corresponding to the given airspeed and MacCready setting.
+        """
         x = self.__v_air_horiz
         f = 1.0
         s = self.sink(v)
@@ -169,6 +192,18 @@ class Polar:
         # v = speed in m/s
         # mc = MacCready setting in m/s
         # self.sink(v) includes Wm = self.__v_air_vert
+        """
+        Compute the residual of the Reichmann speed-to-fly (STF) Equation II for root finding.
+        
+        Parameters:
+            v (float): True airspeed in meters per second.
+            mc (float): MacCready setting (climb rate) in meters per second.
+        
+        Returns:
+            float: The residual s - v * s' - mc, where s is the glider sink rate (including ambient vertical air mass)
+                   evaluated at v, and s' is its derivative with respect to airspeed. A root of this value corresponds
+                   to the Reichmann STF solution.
+        """
         s = self.sink(v)
         s_deriv = self.sink_deriv(v)
         return s - v * s_deriv - mc
@@ -207,10 +242,10 @@ class Polar:
     # degree: the degree (order) of the polynomial to use
     def fit_polar(self, degree):
         """
-        Fit the polar sink-rate data with a polynomial and record fit-quality metrics.
-
-        Stores the fitted polynomial and its derivative on the instance, sets the fitted degree and speed_range, and appends goodness-of-fit information (R^2 and mean squared error) to the instance message log. For degree == 2 the fit excludes speeds below the speed at minimum sink to avoid poor curvature near the stall; for other degrees the full dataset is used.
-
+        Fit a polynomial to the glider's sink-rate (polar) data and record fit diagnostics.
+        
+        Sets instance attributes for the fitted polynomial, its derivative, the fitted degree, and the fitted speed range. Appends R^2 and mean squared error (MSE) information to the instance message log. For degree == 2, speeds below the speed at minimum sink are excluded from the fit to avoid poor curvature near stall; for other degrees the full dataset is used.
+        
         Parameters:
             degree (int): Polynomial degree to fit to the sink-rate data.
         """
@@ -261,14 +296,14 @@ class Polar:
 
     def normal_solver(self, initial_guess, mc):
         """
-        Find a root of the configured goal function starting from an initial guess.
-
+        Find a root of the configured goal function using the provided initial speed guess.
+        
         Parameters:
             initial_guess (float): Initial speed guess in meters per second.
-            mc (pint.Quantity or float): MacCready setting (magnitude) passed to the goal function.
-
+            mc (pint.Quantity or float): MacCready setting passed to the goal function.
+        
         Returns:
-            solution (float or None): Root speed in meters per second when a solution is found; `None` if the solver fails to converge.
+            Root speed in meters per second if a root is found, `None` otherwise.
         """
         [sol, _, err, _msg] = fsolve(
             self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6
@@ -284,14 +319,14 @@ class Polar:
     def bruteforce_solver(self, search_range, mc):
         # First, find a workable range
         """
-        Finds a root of the configured goal function for a given MacCready setting by searching for a bracketing interval and applying a Brent solver.
-
+        Finds a root of the configured goal function for a given MacCready setting by locating a sign-changing bracket and solving it with Brent's method.
+        
         Parameters:
-            search_range (tuple): Lower and upper bound (m/s) used for locating a sign change in the goal function.
-            mc (float): MacCready setting (m/s) to pass to the goal function.
-
+            search_range (tuple): (lower, upper) speed bounds in m/s used to locate a sign change in the goal function.
+            mc (float): MacCready setting in m/s passed to the goal function.
+        
         Returns:
-            float or None: The speed (m/s) at which the goal function is zero if found and converged; `None` if no valid bracket is located or the solver fails to converge.
+            float or None: The speed in m/s where the goal function is zero if a bracket is found and the solver converges; `None` if no sign change is located or the solver fails to converge.
         """
         working_range = search_range
         r0_val = self.goal_function(working_range[0], mc)
