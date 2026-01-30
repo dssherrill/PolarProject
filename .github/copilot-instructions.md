@@ -34,7 +34,7 @@ PolarProject calculates and visualizes glider performance based on **polar curve
 - Metadata: `referenceWeight`, `emptyWeight`, `polarFileName`, `fitStart/fitEnd`
 
 **[datafiles/\*.csv](datafiles/)** - WebPlotDigitizer exports  
-- Format: Speed (kph), Sink (m/s)
+- Format: Speed, Sink (any and all sensible units allowed)
 - Created via [WebPlotDigitizer](https://automeris.io/WebPlotDigitizer)
 - Note: 1 CSV can represent multiple glider variants (e.g., ASK 21 K1 vs K2)
 
@@ -121,7 +121,7 @@ Use `pint_*_demo.py` files for unit/dataframe examples (exploration scripts, not
 
 - **Units must flow through pipelines**: Don't strip `.magnitude` unless absolutely necessary; let Pint track them.
 - **Weight factor applies non-linearly**: Affects both sink rate and all derived metrics.
-- **CSV format strict**: Speed (col 1, kph), Sink (col 2, m/s). No header row.
+- **CSV format strict**: Speed (col 1), Sink (col 2). No header row.
 - **Goal functions differ**: Reichmann minimizes time to reach a goal; "Mine" maximizes average speed accounting for wind.
 - **fsolve() initial guess matters**: Currently 50 knots; may need adjustment for edge cases.
 

@@ -212,19 +212,45 @@ app.layout = dbc.Container(
                                     id="glider_AgGrid",
                                     # className=full_width_class,
                                 ),
+                            ],
+                            className="mb-3",
+                        ),
+                        dbc.Row(
+                            [
+                                # --- Input choices
+                                dbc.Label(
+                                    "Input Option:",
+                                    html_for="radio-weight-or-loading",
+                                    id="input-choice-prompt",
+                                    style={"margin-top": "15px", "width": 450},
+                                ),
+                                dbc.RadioItems(
+                                    options=["Pilot Weight", "Wing Loading"],
+                                    value="Pilot Weight",
+                                    inline=False,
+                                    id="radio-weight-or-loading",
+                                    persistence=True,
+                                    persistence_type="local",
+                                ),
+                            ],
+                            className="mb-3",
+                        ),
+                        dbc.Row(
+                            [
                                 # --- pilot weight
                                 dbc.Label(
                                     "Pilot + Ballast weight (kg):",
-                                    html_for="pilot-weight-input",
-                                    id="pilot-weight-label",
+                                    html_for="pilot-weight-or-wing-loading-input",
+                                    id="pilot-weight-or-wing-loading-label",
                                     style={"margin-top": "15px", "width": 450},
                                 ),
                                 dcc.Input(
-                                    id="pilot-weight-input",
+                                    id="pilot-weight-or-wing-loading-input",
                                     type="number",
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
-                                ),  # , debounce=True),
+                                    # debounce=True,
+                                ),
                             ],
                             className="mb-3",
                         ),
@@ -254,7 +280,11 @@ app.layout = dbc.Container(
                         # --- Polynomial degree
                         dbc.Row(
                             [
-                                dbc.Label("Polynomial degree:", html_for="poly-degree"),
+                                dbc.Label(
+                                    "Polynomial degree:",
+                                    html_for="poly-degree",
+                                    className="text-start",
+                                ),
                             ]
                         ),
                         dbc.Row(
@@ -266,6 +296,8 @@ app.layout = dbc.Container(
                                             type="number",
                                             placeholder=DEFAULT_POLYNOMIAL_DEGREE,
                                             min=2,
+                                            className="text-start",
+                                            # debounce=True,
                                         ),  # style={"width": "1"}),
                                     ]
                                 ),  # width=10),
@@ -284,13 +316,14 @@ app.layout = dbc.Container(
                                     id="statistics",
                                     mathjax=True,  # Enable LaTeX rendering
                                     dangerously_allow_html=True,
+                                    className="text-start",
                                 ),  # enable html display without purify
                             ],
                             # width={"size": 2, "offset": 1},
-                            className="mt-3 mb-3",
+                            # className="mt-3 mb-3",
                         ),
                     ],
-                    style={"flex": "1 1 300px"},
+                    # style={"flex": "1 1 300px"},
                 ),  # width=2),
             ],
         ),
@@ -361,6 +394,7 @@ app.layout = dbc.Container(
                                             id="airmass-horizontal-speed",
                                             type="number",
                                             placeholder="0",
+                                            # debounce=True,
                                         ),
                                     ],
                                 ),  # width=2),
@@ -373,6 +407,7 @@ app.layout = dbc.Container(
                                             id="airmass-vertical-speed",
                                             type="number",
                                             placeholder="0",
+                                            # debounce=True,
                                         ),
                                     ],
                                 ),  # width=2),
@@ -445,33 +480,63 @@ app.layout = dbc.Container(
     Output(component_id="glider_AgGrid", component_property="rowData"),
     Output(component_id="horizontal-speed-label", component_property="children"),
     Output(component_id="vertical-speed-label", component_property="children"),
-    Output(component_id="pilot-weight-label", component_property="children"),
-    Output(component_id="pilot-weight-input", component_property="placeholder"),
-    Output(component_id="pilot-weight-input", component_property="value"),
+    Output(
+        component_id="pilot-weight-or-wing-loading-label", component_property="children"
+    ),
+    Output(
+        component_id="pilot-weight-or-wing-loading-input",
+        component_property="placeholder",
+    ),
+    Output(
+        component_id="pilot-weight-or-wing-loading-input", component_property="value"
+    ),
     Output(component_id="airmass-horizontal-speed", component_property="value"),
     Output(component_id="airmass-vertical-speed", component_property="value"),
     Output("user-data-store", "data"),
     Input(component_id="radio-units", component_property="value"),
+    Input(component_id="radio-weight-or-loading", component_property="value"),
     Input(component_id="glider-dropdown", component_property="value"),
-    Input(component_id="pilot-weight-input", component_property="value"),
+    Input(
+        component_id="pilot-weight-or-wing-loading-input", component_property="value"
+    ),
     Input(component_id="airmass-horizontal-speed", component_property="value"),
     Input(component_id="airmass-vertical-speed", component_property="value"),
     State(component_id="user-data-store", component_property="data"),
     #    prevent_initial_call=True
 )
 def process_unit_change(
-    units, glider_name, pilot_weight_in, v_air_horiz_in, v_air_vert_in, data
+    units,
+    weight_or_loading,
+    glider_name,
+    pilot_weight_or_wing_loading_in,
+    v_air_horiz_in,
+    v_air_vert_in,
+    data,
 ):
     """
-    Update labels based on the selected unit system.
-
+    Update UI labels, placeholders, displayed glider data, and stored user settings when the selected unit system or weight input mode changes.
+    
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        units: Unit system key ('Metric' or 'US') determining weight display units.
-        glider_name: Name of the selected glider as present in the glider info dataset
-        pilot_weight_in: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
-        v_air_horiz_in: Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
-        v_air_vert_in: Vertical airmass speed entered by the user in the selected sink units (None to leave unchanged).
+        units (str): Key from UNIT_CHOICES selecting unit group ("Metric" or "US").
+        weight_or_loading (str): Active weight input mode, either "Pilot Weight" or "Wing Loading".
+        glider_name (str or None): Selected glider name; defaults to DEFAULT_GLIDER_NAME if falsy.
+        pilot_weight_or_wing_loading_in (float or None): Numeric value entered by the user for the active weight mode in the selected units (None to leave unchanged).
+        v_air_horiz_in (float or None): Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
+        v_air_vert_in (float or None): Vertical airmass (sink) speed entered by the user in the selected sink units (None to leave unchanged).
+        data (dict or None): Stored user data with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert"; existing values are used when inputs are None.
+    
+    Returns:
+        tuple: (
+            glider_grid_records (list[dict]): Rows for the glider AgGrid with Metric and US formatted values,
+            horizontal_speed_label (str): Label text for the horizontal speed input (includes unit),
+            vertical_speed_label (str): Label text for the vertical speed input (includes unit),
+            weight_label (str): Label text for the weight input reflecting the active mode and units,
+            weight_placeholder (str): Placeholder string for the weight input showing the reference value,
+            weight_value (float or None): Numeric value to populate the weight input in the selected units, rounded to 0.1, or None,
+            v_air_horiz_out (float or None): Stored horizontal airmass speed converted to the selected speed units and rounded to 0.1, or None,
+            v_air_vert_out (float or None): Stored vertical airmass speed converted to the selected sink units and rounded to 0.1, or None,
+            updated_data (dict): Updated stored values with keys "pilot_weight" (kg or None), "wing_loading" (kg/m^2 or None), "v_air_horiz" (m/s or None), "v_air_vert" (m/s or None)
+        )
     """
     logger.debug(f"process_unit_change called _production_mode={_production_mode}")
 
@@ -485,6 +550,7 @@ def process_unit_change(
 
     # Fetch stored values or initialize to None
     pilot_weight = data.get("pilot_weight") if data else None
+    wing_loading = data.get("wing_loading") if data else None
     v_air_horiz = data.get("v_air_horiz") if data else None
     v_air_vert = data.get("v_air_vert") if data else None
 
@@ -493,6 +559,7 @@ def process_unit_change(
     weight_units = selected_units["Weight"]
     speed_units = selected_units["Speed"]
     sink_units = selected_units["Sink"]
+    pressure_units = selected_units["Pressure"]
 
     set_props("toggle-switch-dump", {"disabled": _production_mode})
 
@@ -502,13 +569,53 @@ def process_unit_change(
         current_glider.referenceWeight() - current_glider.emptyWeight()
     )
 
-    # capture the pilot weight each time it changes
-    if dash.ctx.triggered_id == "pilot-weight-input":
-        logger.debug("pilot-weight-input clicked")
-        if pilot_weight_in is None:
-            pilot_weight = None
-        else:
-            pilot_weight = (pilot_weight_in * weight_units).to("kg").magnitude
+    # capture the pilot weight or wing loading input value each time it changes
+    if dash.ctx.triggered_id == "pilot-weight-or-wing-loading-input":
+        logger.debug("pilot-weight-or-wing-loading-input clicked")
+        if weight_or_loading == "Pilot Weight":
+            if pilot_weight_or_wing_loading_in is None:
+                pilot_weight = None
+                wing_loading = None
+            else:
+                pilot_weight = (
+                    (pilot_weight_or_wing_loading_in * weight_units).to("kg").magnitude
+                )
+                gross_weight = current_glider.emptyWeight().magnitude + pilot_weight
+                wing_loading = gross_weight / current_glider.wingArea().magnitude
+        elif weight_or_loading == "Wing Loading":
+            if pilot_weight_or_wing_loading_in is None:
+                pilot_weight = None
+                wing_loading = None
+            else:
+                wing_loading = (
+                    (pilot_weight_or_wing_loading_in * pressure_units)
+                    .to("kg/m**2")
+                    .magnitude
+                )
+                gross_weight = wing_loading * current_glider.wingArea().magnitude
+                pilot_weight = gross_weight - current_glider.emptyWeight().magnitude
+
+    pilot_weight_or_wing_loading_label = (
+        f"Pilot + Ballast weight ({weight_units.units:~P}):"
+        if weight_or_loading == "Pilot Weight"
+        else f"Wing Loading ({pressure_units.units:~P}):"
+    )
+
+    pilot_weight_or_wing_loading_value = (
+        round((pilot_weight * ureg("kg")).to(weight_units).magnitude, 1)
+        if (weight_or_loading == "Pilot Weight" and pilot_weight is not None)
+        else (
+            round((wing_loading * ureg("kg/m**2")).to(pressure_units).magnitude, 1)
+            if (weight_or_loading == "Wing Loading" and wing_loading is not None)
+            else None
+        )
+    )
+
+    pilot_weight_or_wing_loading_placeholder = (
+        f"{reference_pilot_weight.to(weight_units).magnitude:.1f}"
+        if weight_or_loading == "Pilot Weight"
+        else f"{current_glider.referenceWingLoading().to(pressure_units).magnitude:.1f}"
+    )
 
     # pilot_weight must remain "None" until set by the user
     # this allows the reference pilot weight to be used until an actual pilot weight is entered
@@ -518,9 +625,18 @@ def process_unit_change(
         else reference_pilot_weight
     )
 
+    working_wing_loading = (
+        wing_loading * ureg("kg/m**2")
+        if wing_loading is not None
+        else current_glider.referenceWingLoading()
+    )
+
+    gross_weight = current_glider.emptyWeight() + working_pilot_weight
+
     # capture the horizontal airmass speed each time it changes
     if dash.ctx.triggered_id == "airmass-horizontal-speed":
         logger.debug("airmass-horizontal-speed clicked")
+
         if v_air_horiz_in is None:
             v_air_horiz = None
         else:
@@ -533,9 +649,6 @@ def process_unit_change(
             v_air_vert = None
         else:
             v_air_vert = (v_air_vert_in * sink_units).to("m/s").magnitude
-
-    gross_weight = current_glider.emptyWeight() + working_pilot_weight
-    wing_loading = gross_weight / current_glider.wingArea()
 
     glider_data = pd.DataFrame(
         {
@@ -551,14 +664,14 @@ def process_unit_change(
                 f"{current_glider.emptyWeight():.1f~P}",
                 f"{working_pilot_weight:.1f~P}",
                 f"{gross_weight:.1f~P}",
-                f"{wing_loading:.1f~P}",
+                f"{working_wing_loading:.1f~P}",
             ],
             "US": [
                 f"{current_glider.referenceWeight().to(US_UNITS['Weight']):.1f~P}",
                 f"{current_glider.emptyWeight().to(US_UNITS['Weight']):.1f~P}",
                 f"{working_pilot_weight.to(US_UNITS['Weight']):.1f~P}",
                 f"{gross_weight.to(US_UNITS['Weight']):.1f~P}",
-                f"{(wing_loading.to(US_UNITS['Pressure'])):.1f~P}",
+                f"{(working_wing_loading.to(US_UNITS['Pressure'])):.1f~P}",
             ],
         }
     )
@@ -567,25 +680,22 @@ def process_unit_change(
         glider_data.to_dict("records"),
         f"Horizontal speed ({selected_units['Speed'].units:~P}):",
         f"Vertical speed ({selected_units['Sink'].units:~P}):",
-        f"Pilot + Ballast weight ({selected_units['Weight'].units:~P}):",
-        f"{reference_pilot_weight.to(weight_units).magnitude:.1f}",
+        pilot_weight_or_wing_loading_label,
+        pilot_weight_or_wing_loading_placeholder,
+        pilot_weight_or_wing_loading_value,
         (
-            f"{working_pilot_weight.to(weight_units).magnitude:.1f}"
-            if pilot_weight is not None
-            else None
-        ),
-        (
-            f"{(v_air_horiz * ureg('m/s')).to(speed_units).magnitude:.1f}"
+            round((v_air_horiz * ureg("m/s")).to(speed_units).magnitude, 1)
             if v_air_horiz is not None
             else None
         ),
         (
-            f"{(v_air_vert * ureg('m/s')).to(sink_units).magnitude:.1f}"
+            round((v_air_vert * ureg("m/s")).to(sink_units).magnitude, 1)
             if v_air_vert is not None
             else None
         ),
         {
             "pilot_weight": pilot_weight,
+            "wing_loading": wing_loading,
             "v_air_horiz": v_air_horiz if v_air_horiz is not None else None,
             "v_air_vert": v_air_vert if v_air_vert is not None else None,
         },
