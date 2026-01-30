@@ -1,3 +1,4 @@
+import math
 import os
 
 import numpy as np
@@ -249,7 +250,7 @@ app.layout = dbc.Container(
                                     type="number",
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
-                                    # debounce=True,
+                                    debounce=0.75,
                                 ),
                             ],
                             className="mb-3",
@@ -297,7 +298,7 @@ app.layout = dbc.Container(
                                             placeholder=DEFAULT_POLYNOMIAL_DEGREE,
                                             min=2,
                                             className="text-start",
-                                            # debounce=True,
+                                            debounce=0.75,
                                         ),  # style={"width": "1"}),
                                     ]
                                 ),  # width=10),
@@ -394,7 +395,7 @@ app.layout = dbc.Container(
                                             id="airmass-horizontal-speed",
                                             type="number",
                                             placeholder="0",
-                                            # debounce=True,
+                                            debounce=0.75,
                                         ),
                                     ],
                                 ),  # width=2),
@@ -407,7 +408,7 @@ app.layout = dbc.Container(
                                             id="airmass-vertical-speed",
                                             type="number",
                                             placeholder="0",
-                                            # debounce=True,
+                                            debounce=0.75,
                                         ),
                                     ],
                                 ),  # width=2),
@@ -490,6 +491,7 @@ app.layout = dbc.Container(
     Output(
         component_id="pilot-weight-or-wing-loading-input", component_property="value"
     ),
+    Output(component_id="pilot-weight-or-wing-loading-input", component_property="min"),
     Output(component_id="airmass-horizontal-speed", component_property="value"),
     Output(component_id="airmass-vertical-speed", component_property="value"),
     Output("user-data-store", "data"),
@@ -515,7 +517,7 @@ def process_unit_change(
 ):
     """
     Update UI labels, placeholders, displayed glider data, and stored user settings when the selected unit system or weight input mode changes.
-    
+
     Parameters:
         units (str): Key from UNIT_CHOICES selecting unit group ("Metric" or "US").
         weight_or_loading (str): Active weight input mode, either "Pilot Weight" or "Wing Loading".
@@ -524,7 +526,7 @@ def process_unit_change(
         v_air_horiz_in (float or None): Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
         v_air_vert_in (float or None): Vertical airmass (sink) speed entered by the user in the selected sink units (None to leave unchanged).
         data (dict or None): Stored user data with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert"; existing values are used when inputs are None.
-    
+
     Returns:
         tuple: (
             glider_grid_records (list[dict]): Rows for the glider AgGrid with Metric and US formatted values,
@@ -569,6 +571,15 @@ def process_unit_change(
         current_glider.referenceWeight() - current_glider.emptyWeight()
     )
 
+    # require pilot weight to be non-negative
+    min_wing_loading = (
+        current_glider.emptyWeight() / current_glider.wingArea()
+    ).magnitude
+
+    min_wing_loading_display = math.ceil(
+        (min_wing_loading * ureg("kg/m**2")).to(pressure_units).magnitude
+    )
+
     # capture the pilot weight or wing loading input value each time it changes
     if dash.ctx.triggered_id == "pilot-weight-or-wing-loading-input":
         logger.debug("pilot-weight-or-wing-loading-input clicked")
@@ -592,13 +603,16 @@ def process_unit_change(
                     .to("kg/m**2")
                     .magnitude
                 )
+
+                if wing_loading < min_wing_loading:
+                    wing_loading = min_wing_loading  # adjust to minimum
                 gross_weight = wing_loading * current_glider.wingArea().magnitude
                 pilot_weight = gross_weight - current_glider.emptyWeight().magnitude
 
     pilot_weight_or_wing_loading_label = (
         f"Pilot + Ballast weight ({weight_units.units:~P}):"
         if weight_or_loading == "Pilot Weight"
-        else f"Wing Loading ({pressure_units.units:~P}):"
+        else f"Wing Loading ({pressure_units.units:~P}), min {min_wing_loading_display:.0f} {pressure_units.units:~P}:"
     )
 
     pilot_weight_or_wing_loading_value = (
@@ -683,6 +697,7 @@ def process_unit_change(
         pilot_weight_or_wing_loading_label,
         pilot_weight_or_wing_loading_placeholder,
         pilot_weight_or_wing_loading_value,
+        (0.0 if weight_or_loading == "Pilot Weight" else min_wing_loading_display),
         (
             round((v_air_horiz * ureg("m/s")).to(speed_units).magnitude, 1)
             if v_air_horiz is not None
