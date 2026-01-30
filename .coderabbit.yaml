@@ -1,2 +1,7 @@
 reviews:
   request_changes_workflow: true
+  finishing_touches:
+    unit_tests:
+      enabled: true
+
+      

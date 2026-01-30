@@ -53,8 +53,8 @@ class Glider:
 
         Description:
             - On success populates self.__speed_data with speeds converted to meters per second and self.__sink_data with sink rates as meters per second.
-            - On FileNotFoundError sets both __speed_data and __sink_data to None and appends an error message to self.__messages.
-            - On any other exception sets both __speed_data and __sink_data to None and appends the exception message to self.__messages.
+            - On FileNotFoundError, appends an error message to self.__messages and raises FileNotFoundError.
+            - On any other exception, appends the exception message to self.__messages and raises RuntimeError.
             - Raises ValueError if the loaded speed or sink arrays are missing or empty after reading the CSV.
         """
 
@@ -106,6 +106,9 @@ class Glider:
 
     def referenceWeight(self):
         return self.__ref_weight
+
+    def referenceWingLoading(self):
+        return self.__ref_weight / self.__wing_area
 
     def emptyWeight(self):
         return self.__empty_weight
