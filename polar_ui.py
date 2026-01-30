@@ -514,15 +514,29 @@ def process_unit_change(
     data,
 ):
     """
-    Update labels based on the selected unit system.
-
+    Update UI labels, placeholders, displayed glider data, and stored user settings when the selected unit system or weight input mode changes.
+    
     Parameters:
-        data: Stored user data including pilot weight and airmass speeds.
-        units: Unit system key ('Metric' or 'US') determining weight display units.
-        glider_name: Name of the selected glider as present in the glider info dataset
-        pilot_weight_in: Pilot+ballast weight entered by the user in the selected weight units (None to leave unchanged).
-        v_air_horiz_in: Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
-        v_air_vert_in: Vertical airmass speed entered by the user in the selected sink units (None to leave unchanged).
+        units (str): Key from UNIT_CHOICES selecting unit group ("Metric" or "US").
+        weight_or_loading (str): Active weight input mode, either "Pilot Weight" or "Wing Loading".
+        glider_name (str or None): Selected glider name; defaults to DEFAULT_GLIDER_NAME if falsy.
+        pilot_weight_or_wing_loading_in (float or None): Numeric value entered by the user for the active weight mode in the selected units (None to leave unchanged).
+        v_air_horiz_in (float or None): Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
+        v_air_vert_in (float or None): Vertical airmass (sink) speed entered by the user in the selected sink units (None to leave unchanged).
+        data (dict or None): Stored user data with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert"; existing values are used when inputs are None.
+    
+    Returns:
+        tuple: (
+            glider_grid_records (list[dict]): Rows for the glider AgGrid with Metric and US formatted values,
+            horizontal_speed_label (str): Label text for the horizontal speed input (includes unit),
+            vertical_speed_label (str): Label text for the vertical speed input (includes unit),
+            weight_label (str): Label text for the weight input reflecting the active mode and units,
+            weight_placeholder (str): Placeholder string for the weight input showing the reference value,
+            weight_value (float or None): Numeric value to populate the weight input in the selected units, rounded to 0.1, or None,
+            v_air_horiz_out (float or None): Stored horizontal airmass speed converted to the selected speed units and rounded to 0.1, or None,
+            v_air_vert_out (float or None): Stored vertical airmass speed converted to the selected sink units and rounded to 0.1, or None,
+            updated_data (dict): Updated stored values with keys "pilot_weight" (kg or None), "wing_loading" (kg/m^2 or None), "v_air_horiz" (m/s or None), "v_air_vert" (m/s or None)
+        )
     """
     logger.debug(f"process_unit_change called _production_mode={_production_mode}")
 
