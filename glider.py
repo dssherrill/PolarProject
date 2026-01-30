@@ -46,16 +46,17 @@ class Glider:
     # y = second column = sink in m per second (all values should be negative)
     def load_CSV(self, current_glider, speed_units, sink_units):
         """
-        Load polar speed and sink data from a CSV file in ./datafiles and store them as pint-quantified NumPy arrays.
-
+        Load polar speed and sink data from a CSV file referenced by the provided glider record and store them as pint-quantified NumPy arrays.
+        
         Parameters:
-            polar_file_name (str): CSV file name located in ./datafiles/; expected format: first column = speed in km/h, second column = sink in m/s.
-
-        Description:
-            - On success populates self.__speed_data with speeds converted to meters per second and self.__sink_data with sink rates as meters per second.
-            - On FileNotFoundError, appends an error message to self.__messages and raises FileNotFoundError.
-            - On any other exception, appends the exception message to self.__messages and raises RuntimeError.
-            - Raises ValueError if the loaded speed or sink arrays are missing or empty after reading the CSV.
+            current_glider (pandas.DataFrame): A one-row DataFrame containing glider metadata; must include a 'polarFileName' column whose first value is the CSV filename located under ./datafiles/.
+            speed_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV speed column before converting to meters per second.
+            sink_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV sink column before converting to meters per second.
+        
+        Raises:
+            FileNotFoundError: If the CSV file specified by 'polarFileName' cannot be found under ./datafiles/.
+            RuntimeError: If an unexpected error occurs while reading the CSV file.
+            ValueError: If the loaded speed or sink arrays are empty after reading the CSV.
         """
 
         polar_file_name = current_glider["polarFileName"].iloc[0]
@@ -105,12 +106,32 @@ class Glider:
         return self.__sink_data
 
     def referenceWeight(self):
+        """
+        Return the stored reference weight of the glider.
+        
+        Returns:
+            float: Reference weight in kilograms.
+        """
         return self.__ref_weight
 
     def referenceWingLoading(self):
+        """
+        Compute the glider's reference wing loading.
+        
+        Reference wing loading is the stored reference weight divided by the stored wing area.
+        
+        Returns:
+            wing_loading (float): Reference wing loading in kilograms per square meter (kg/m^2).
+        """
         return self.__ref_weight / self.__wing_area
 
     def emptyWeight(self):
+        """
+        Get the glider's stored empty weight.
+        
+        Returns:
+            empty_weight (float): The empty weight of the glider in kilograms.
+        """
         return self.__empty_weight
 
     def wingArea(self):
