@@ -455,7 +455,7 @@ app.layout = dbc.Container(
                             className="mb-3",
                         ),
                         dbc.Label(
-                            "MacCready Value for Goal Function graph",
+                            "MacCready Value for Goal Function debug graph",
                             html_for="ref-weight-input",
                             className="w-2",
                         ),

@@ -31,11 +31,11 @@ class Polar:
     ):
         """
         Initialize a Polar model from a glider dataset and flight conditions.
-        
+
         Configures the instance with the provided glider record, goal selection, and airspeed
         components; computes the flight weight and a weight-scaling factor, records status
         messages, and fits the polar sink-rate polynomial.
-        
+
         Parameters:
             current_glider (glider.Glider): Glider record providing reference and empty weights
                 and polar data accessors.
@@ -45,7 +45,7 @@ class Polar:
             v_air_vert: Vertical component of ambient airspeed (quantity expected by caller).
             pilot_weight (optional): Pilot weight to add to empty weight (quantity with units,
                 if omitted the glider's reference weight is used).
-        
+
         Side effects:
             - Stores configuration and computed weight/weight-factor on the instance.
             - Appends status messages to the instance message log.
@@ -81,7 +81,7 @@ class Polar:
     def messages(self):
         """
         Get accumulated status and error messages for this Polar instance.
-        
+
         Returns:
             str: Concatenated message string collected during operations; empty string if no messages.
         """
@@ -93,7 +93,7 @@ class Polar:
     def get_weight_fly(self):
         """
         Return the computed flight weight used for performance calculations.
-        
+
         Returns:
             The flight weight (includes glider empty weight plus pilot weight when provided) as a pint quantity with units of kilograms.
         """
@@ -102,7 +102,7 @@ class Polar:
     def get_weight_factor(self):
         """
         Provide the dimensionless weight-scaling factor applied to the polar.
-        
+
         Returns:
             float: Weight factor (greater than 0) used to scale speeds and sink rates, computed as sqrt(flight weight / reference weight).
         """
@@ -153,10 +153,10 @@ class Polar:
     def sink_deriv(self, v):
         """
         Evaluate the derivative of the fitted sink-rate polynomial with respect to true airspeed, applying the instance weight factor.
-        
+
         Parameters:
             v: True airspeed at which to evaluate the derivative (speed quantity).
-        
+
         Returns:
             The derivative of sink rate with respect to true airspeed at `v`, with the configured weight scaling applied (sink change per unit speed).
         """
@@ -168,11 +168,11 @@ class Polar:
     def v_avg(self, v, mc):
         """
         Compute the net cross-country average speed accounting for thermalling time.
-        
+
         Parameters:
             v (Quantity or float): True airspeed at which to evaluate average speed.
             mc (Quantity or float): MacCready setting (expected vertical speed).
-        
+
         Returns:
             Vavg (Quantity or float): Net cross-country speed corresponding to the given airspeed and MacCready setting.
         """
@@ -194,11 +194,11 @@ class Polar:
         # self.sink(v) includes Wm = self.__v_air_vert
         """
         Compute the residual of the Reichmann speed-to-fly (STF) Equation II for root finding.
-        
+
         Parameters:
             v (float): True airspeed in meters per second.
             mc (float): MacCready setting (climb rate) in meters per second.
-        
+
         Returns:
             float: The residual s - v * s' - mc, where s is the glider sink rate (including ambient vertical air mass)
                    evaluated at v, and s' is its derivative with respect to airspeed. A root of this value corresponds
@@ -243,9 +243,9 @@ class Polar:
     def fit_polar(self, degree):
         """
         Fit a polynomial to the glider's sink-rate (polar) data and record fit diagnostics.
-        
+
         Sets instance attributes for the fitted polynomial, its derivative, the fitted degree, and the fitted speed range. Appends R^2 and mean squared error (MSE) information to the instance message log. For degree == 2, speeds below the speed at minimum sink are excluded from the fit to avoid poor curvature near stall; for other degrees the full dataset is used.
-        
+
         Parameters:
             degree (int): Polynomial degree to fit to the sink-rate data.
         """
@@ -258,8 +258,8 @@ class Polar:
 
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
-        min_sink_index = np.argmax(sink)
-        if degree == 2:
+        if degree <= 3:
+            min_sink_index = np.argmax(sink)
             start_index = min_sink_index
         else:
             start_index = 0
@@ -297,11 +297,11 @@ class Polar:
     def normal_solver(self, initial_guess, mc):
         """
         Find a root of the configured goal function using the provided initial speed guess.
-        
+
         Parameters:
             initial_guess (float): Initial speed guess in meters per second.
             mc (pint.Quantity or float): MacCready setting passed to the goal function.
-        
+
         Returns:
             Root speed in meters per second if a root is found, `None` otherwise.
         """
@@ -320,11 +320,11 @@ class Polar:
         # First, find a workable range
         """
         Finds a root of the configured goal function for a given MacCready setting by locating a sign-changing bracket and solving it with Brent's method.
-        
+
         Parameters:
             search_range (tuple): (lower, upper) speed bounds in m/s used to locate a sign change in the goal function.
             mc (float): MacCready setting in m/s passed to the goal function.
-        
+
         Returns:
             float or None: The speed in m/s where the goal function is zero if a bracket is found and the solver converges; `None` if no sign change is located or the solver fails to converge.
         """
