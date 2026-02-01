@@ -267,6 +267,7 @@ class Polar:
         self.__sink_poly, (SSE, _rank, _sv, _rcond) = Poly.fit(
             speed[start_index:], sink[start_index:], degree, full=True
         )
+        logger.debug(f"Fitted polar polynomial coefficients: {self.__sink_poly.coef}")
         self.__sink_deriv_poly = self.__sink_poly.deriv()
 
         # Generate predicted y-values
@@ -335,9 +336,9 @@ class Polar:
         if r0_val * r1_val > 0:
             # goal function has same sign at both ends of range
             # Brute force search for a better range
-            logger.debug(
-                f"Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})"
-            )
+            # logger.debug(
+            #     f"Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})"
+            # )
             r0 = working_range[0]
             for r1 in np.arange(working_range[0], 1.5 * working_range[1], 5.0):
                 r1_val = self.goal_function(r1, mc)
@@ -351,7 +352,7 @@ class Polar:
                 r0_val = r1_val
 
         if r0_val * r1_val > 0:
-            self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {search_range[0]:0.2f} to {search_range[1]:0.2f} m/s\n"
+            # self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {search_range[0]:0.2f} to {search_range[1]:0.2f} m/s\n"
             solution = None
         else:
             # bruteforce solver
@@ -387,12 +388,15 @@ class Polar:
                 - L/D: Lift-to-drag ratio at the STF (dimensionless)
                 - solverResult: Value of the goal-function (solver residual) at the found STF
         """
+        # optimum speed-to-fly
+        Vstf = np.zeros(len(mcTable))
 
-        Vstf = np.zeros(len(mcTable))  # optimum speed-to-fly
-        Vavg = np.zeros(
-            len(mcTable)
-        )  # net cross-country speed, taking thermalling time into account
-        LD = np.zeros(len(mcTable))  # L/D ratio at Vstf
+        # net cross-country speed, taking thermalling time into account
+        Vavg = np.zeros(len(mcTable))
+
+        # L/D ratio at Vstf
+        LD = np.zeros(len(mcTable))
+
         solver_result = np.zeros(len(mcTable))
 
         # Guess 50 knots, but must express as m/s

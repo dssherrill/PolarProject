@@ -422,24 +422,34 @@ app.layout = dbc.Container(
         ),
         dbc.Row(
             [
-                html.Div("Debug Options", className="text-primary fs-3 mt-5"),
-                dbc.Switch(
-                    id="toggle-switch-debug",
-                    label="Include debug graphs",
-                    value=False,  # Initial state
-                    className="ms-3",
-                ),
-                # ]),
-                # dbc.Row([
-                dbc.Switch(
-                    id="toggle-switch-dump",
-                    label="Dump file",
-                    value=False,  # Initial state
-                    className="ms-3",
-                    disabled=True,  # enabled only in development, never in production
-                ),
                 dbc.Col(
                     [
+                        html.Div("Debug Options", className="text-primary fs-3 mt-5"),
+                        dbc.Switch(
+                            id="toggle-switch-dump",
+                            label="Dump file",
+                            value=False,  # Initial state
+                            className="ms-3",
+                            disabled=True,  # enabled only in development, never in production
+                        ),
+                        dbc.Switch(
+                            id="toggle-switch-debug",
+                            label="Include debug graphs (Residuals, Goal Function and Solver Result)",
+                            value=False,  # Initial state
+                            className="ms-3",
+                        ),
+                        dbc.Label(
+                            "MacCready Value for Goal Function debug graph",
+                            html_for="ref-weight-input",
+                            className="w-2",
+                        ),
+                        html.Br(),
+                        dcc.Input(
+                            id="maccready-input",
+                            type="number",
+                            placeholder="0",
+                            style={"width": 450},
+                        ),
                         dbc.Row(
                             [
                                 html.Div(
@@ -454,13 +464,6 @@ app.layout = dbc.Container(
                             ],
                             className="mb-3",
                         ),
-                        dbc.Label(
-                            "MacCready Value for Goal Function debug graph",
-                            html_for="ref-weight-input",
-                            className="w-2",
-                        ),
-                        html.Br(),
-                        dcc.Input(id="maccready-input", type="number", placeholder="0"),
                     ],
                 ),  # width=2),
             ],
@@ -790,10 +793,11 @@ def update_graph(
 
     # Fetch stored values or initialize to None
     pilot_weight = data.get("pilot_weight") if data else None
+    wing_loading = data.get("wing_loading") if data else None
     v_air_horiz = data.get("v_air_horiz") if data else None
     v_air_vert = data.get("v_air_vert") if data else None
     logger.info(
-        f"glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}"
+        f"glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, wing_loading: {wing_loading}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}"
     )
 
     # Setup units
@@ -827,6 +831,143 @@ def update_graph(
     )
     weight_factor = current_polar.get_weight_factor()
 
+    ##################################################################
+    # Graph Speed-to-Fly vs. MC setting
+    # MacCready values for table, zero to 10 knots, but must be converted to m/s
+    mc_graph_values = (np.arange(start=0.0, stop=10.01, step=0.02) * ureg.knots).to(
+        "m/s"
+    )
+    df_mc_graph = current_polar.MacCready(mc_graph_values)
+
+    stf_graph = make_subplots(specs=[[{"secondary_y": True}]])
+    trace_weight_adjusted = go.Scatter(
+        x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
+        y=df_mc_graph["STF"].pint.to(speed_units).pint.magnitude,
+        name="Speed-to-Fly",
+        mode="lines",
+    )
+    stf_graph.add_trace(
+        trace_weight_adjusted,
+        secondary_y=False,
+    )
+
+    ##################################################################
+    # Collect results if Excel output requested
+    if write_excel_file:
+        if df_out is None:
+            df_out = pd.DataFrame(df_mc_graph["MC"].pint.to(sink_units).pint.magnitude)
+            logger.debug("created df_out")
+        column_name = f"Degree {degree}"
+        df_out[column_name] = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
+
+        logger.debug(df_out.columns)
+        # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
+
+        # Save results externally
+        # Open the file in write mode ('w') with newline=''
+        excel_outfile_name = f"{glider_name} stf.xlsx"
+        df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
+
+        logger.info(f'File "{excel_outfile_name}" created successfully')
+    else:
+        # Delete any accumulated data
+        df_out = None
+
+    ###################################################################
+    # Plot average speed vs. MC setting
+    # Clip Vavg to stay on the STF graph without expanding the Y axis too much
+    plot_max = max(df_mc_graph["STF"].pint.to(speed_units).pint.magnitude)
+    y = df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
+    y[(y <= -50.0) | (y >= plot_max)] = np.nan
+    trace_stf = go.Scatter(
+        x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
+        y=y,
+        name="Average Speed",
+        mode="lines",
+    )
+    stf_graph.add_trace(
+        trace_stf,
+        secondary_y=False,
+    )
+
+    if show_debug_graphs:
+        trace_goal_result = go.Scatter(
+            x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
+            y=df_mc_graph["solverResult"],
+            name="Solver Result",
+            mode="lines",
+        )
+        stf_graph.add_trace(
+            trace_goal_result,
+            secondary_y=True,
+        )
+
+    stf_graph.update_layout(
+        xaxis_title=f"MacCready Setting ({sink_units.units:~P})",
+        yaxis_title=f"Speed ({speed_units.units:~P})",
+        title={
+            "text": "MacCready Speed-to-Fly",
+            "y": 0.9,
+            "x": 0.5,
+            "xanchor": "center",
+            "yanchor": "top",
+        },
+        yaxis2=dict(
+            title="Solver Result",  # Title for the second (right) vertical axis
+            overlaying="y",
+            side="right",
+        ),
+        legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+    )
+    ###################################################################
+    # Calculate MacCready table data
+    if sink_units == ureg("m/s"):
+        # MacCready values for table, in m/s
+        mc_table_values = np.arange(start=0.0, stop=5.1, step=0.5) * ureg.mps
+    else:
+        # MacCready values for table in knots, but must be converted to m/s
+        mc_table_values = (np.arange(start=0.0, stop=10.1, step=1.0) * ureg.knots).to(
+            ureg.mps
+        )
+
+    df_mc_table = current_polar.MacCready(mc_table_values)
+
+    df_mc_table["MC"] = df_mc_table["MC"].pint.to(sink_units).pint.magnitude
+    df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
+    df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
+
+    logger.info(current_polar.messages())
+
+    # Store MacCready results in DataFrame for AG Grid
+    # AG Grid is arranged as MC, STF, Vavg, L/D
+    new_column_defs = [
+        {
+            "field": "MC",
+            "type": "numericColumn",
+            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
+            "headerName": f"MC ({sink_units.units:~#})",
+        },
+        {
+            "field": "STF",
+            "type": "numericColumn",
+            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
+            "headerName": f"STF ({speed_units.units:~P})",
+        },
+        {
+            "field": "Vavg",
+            "type": "numericColumn",
+            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
+            "headerName": f"Vavg ({speed_units.units:~P})",
+        },
+        {
+            "field": "L/D",
+            "type": "numericColumn",
+            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
+            "headerName": "L/D",
+        },
+        #        "columnSize": "autoSize",
+    ]
+
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
     trace_data = go.Scatter(
@@ -839,21 +980,44 @@ def update_graph(
 
     # Graph the fit to the data on the same graph
     # Evaluate the polynomial for new points
-    r = current_polar.speed_range
-    speed_mps_magnitude = np.linspace(r[0], r[1], 100)
-    speed = (speed_mps_magnitude * ureg("m/s")).to(speed_units).magnitude
-    sink = (
-        (
-            current_polar.sink(
-                speed_mps_magnitude, weight_correction=False, include_airmass=False
-            )
-            * ureg("m/s")
-        )
-        .to(sink_units)
-        .magnitude
+    # Expand the speed range to show extrapolation used in STF calculation, if any.
+    polar_speed_range = current_polar.speed_range
+    stf_speed_range = (
+        min(df_mc_graph["STF"]).magnitude,
+        max(df_mc_graph["STF"]).magnitude,
     )
+    graph_range = (
+        min(polar_speed_range[0], stf_speed_range[0]),
+        max(polar_speed_range[1], stf_speed_range[1]),
+    )
+
+    # Make the speed points at 0.5 m/s intervals
+    speed_mps_magnitude = np.arange(
+        round((2 * graph_range[0]) / 2.0) - 1, 1 + round(2 * graph_range[1]) / 2.0, 0.5
+    )
+
+    speed = (speed_mps_magnitude * ureg("m/s")).to(speed_units).magnitude
+    sink = current_polar.sink(
+        speed_mps_magnitude, weight_correction=False, include_airmass=False
+    )
+    sink = (sink * ureg("m/s")).to(sink_units).magnitude
+
     trace_fit = go.Scatter(x=speed, y=sink, name=f"Fit, degree={degree}")
     polar_graph.add_trace(trace_fit)
+
+    if show_debug_graphs:
+        goal_function_values = current_polar.goal_function(
+            speed_mps_magnitude, maccready.magnitude
+        )
+        # goal_function_values[
+        #     (goal_function_values >= 10) | (goal_function_values <= -10)
+        # ] = np.nan
+        trace_goal = go.Scatter(
+            x=speed,
+            y=goal_function_values,
+            name="Goal Function",
+        )
+        polar_graph.add_trace(trace_goal)
 
     if show_debug_graphs:
         # Graph the residuals (difference between the data and the fit)
@@ -863,9 +1027,10 @@ def update_graph(
             weight_correction=False,
             include_airmass=False,
         )
-        residual = current_glider.get_sink_data().to(sink_units) - (
-            sink_fit * ureg("m/s")
-        ).to(sink_units)
+        residual = (current_glider.get_sink_data() - (sink_fit * ureg("m/s"))).to(
+            sink_units
+        )
+
         trace_residuals = go.Scatter(
             x=speed_data.magnitude, y=residual.magnitude, name="Residuals"
         )
@@ -910,160 +1075,20 @@ def update_graph(
 
     polar_graph.update_yaxes(tickformat=".1f", secondary_y=False)
 
-    # Graph Speed-to-Fly vs. MC setting
-    # MacCready values for table, zero to 10 knots, but must be converted to m/s
-    mc_table = (np.arange(start=0.0, stop=10.01, step=0.02) * ureg.knots).to("m/s")
-    df_mc = current_polar.MacCready(mc_table)
-    # v =df_fit['Speed'].pint.magnitude
-
-    if show_debug_graphs:
-        goal_function_values = current_polar.goal_function(
-            speed_mps_magnitude, maccready.magnitude
-        )
-        goal_function_values[
-            (goal_function_values >= 10) | (goal_function_values <= -10)
-        ] = np.nan
-        trace_goal = go.Scatter(
-            x=speed,
-            y=goal_function_values,
-            name="Goal Function",
-        )
-        polar_graph.add_trace(trace_goal)
-
-    stf_graph = make_subplots(specs=[[{"secondary_y": True}]])
-    trace_weight_adjusted = go.Scatter(
-        x=df_mc["MC"].pint.to(sink_units).pint.magnitude,
-        y=df_mc["STF"].pint.to(speed_units).pint.magnitude,
-        name="Speed-to-Fly",
-        mode="lines",
-    )
-    stf_graph.add_trace(
-        trace_weight_adjusted,
-        secondary_y=False,
-    )
-
-    # Collect results if Excel output requested
-    if write_excel_file:
-        if df_out is None:
-            df_out = pd.DataFrame(df_mc["MC"].pint.to(sink_units).pint.magnitude)
-            logger.debug("created df_out")
-        column_name = f"Degree {degree}"
-        df_out[column_name] = df_mc["STF"].pint.to(speed_units).pint.magnitude
-
-        logger.debug(df_out.columns)
-        # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
-
-        # Save results externally
-        # Open the file in write mode ('w') with newline=''
-        excel_outfile_name = f"{glider_name} stf.xlsx"
-        df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
-
-        logger.info(f'File "{excel_outfile_name}" created successfully')
-    else:
-        # Delete any accumulated data
-        df_out = None
-
-    plot_max = max(df_mc["STF"].pint.to(speed_units).pint.magnitude)
-    y = df_mc["Vavg"].pint.to(speed_units).pint.magnitude
-    y[(y <= -50.0) | (y >= plot_max)] = np.nan
-    trace_stf = go.Scatter(
-        x=df_mc["MC"].pint.to(sink_units).pint.magnitude,
-        y=y,
-        name="Average Speed",
-        mode="lines",
-    )
-    stf_graph.add_trace(
-        trace_stf,
-        secondary_y=False,
-    )
-
-    if show_debug_graphs:
-        trace_goal_result = go.Scatter(
-            x=df_mc["MC"].pint.to(sink_units).pint.magnitude,
-            y=df_mc["solverResult"],
-            name="Solver Result",
-            mode="lines",
-        )
-        stf_graph.add_trace(
-            trace_goal_result,
-            secondary_y=True,
-        )
-
-    stf_graph.update_layout(
-        xaxis_title=f"MacCready Setting ({sink_units.units:~P})",
-        yaxis_title=f"Speed ({speed_units.units:~P})",
-        title={
-            "text": "MacCready Speed-to-Fly",
-            "y": 0.9,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top",
-        },
-        yaxis2=dict(
-            title="Solver Result",  # Title for the second (right) vertical axis
-            overlaying="y",
-            side="right",
-        ),
-        legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-    )
-
-    if sink_units == ureg("m/s"):
-        # MacCready values for table, in m/s
-        mc_table = np.arange(start=0.0, stop=5.1, step=0.5) * ureg.mps
-    else:
-        # MacCready values for table in knots, but must be coverted to m/s
-        mc_table = (np.arange(start=0.0, stop=10.1, step=1.0) * ureg.knots).to(ureg.mps)
-
-    df_mc = current_polar.MacCready(mc_table)
-
-    df_mc["MC"] = df_mc["MC"].pint.to(sink_units).pint.magnitude
-    df_mc["STF"] = df_mc["STF"].pint.to(speed_units).pint.magnitude
-    df_mc["Vavg"] = df_mc["Vavg"].pint.to(speed_units).pint.magnitude
-
-    logger.info(current_polar.messages())
-
-    # pd.DataFrame({'MC': [0], 'STF': [0], 'Vavg': [0], 'L/D': [0]})
-    new_column_defs = [
-        {
-            "field": "MC",
-            "type": "numericColumn",
-            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
-            "headerName": f"MC ({sink_units.units:~#})",
-        },
-        {
-            "field": "STF",
-            "type": "numericColumn",
-            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
-            "headerName": f"STF ({speed_units.units:~P})",
-        },
-        {
-            "field": "Vavg",
-            "type": "numericColumn",
-            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
-            "headerName": f"Vavg ({speed_units.units:~P})",
-        },
-        {
-            "field": "L/D",
-            "type": "numericColumn",
-            "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
-            "headerName": "L/D",
-        },
-        #        "columnSize": "autoSize",
-    ]
-
     logger.debug("update_graph return\n")
     return (
         glider_name,
         current_polar.messages(),
         polar_graph,
         stf_graph,
-        df_mc.to_dict("records"),
+        df_mc_table.to_dict("records"),
         new_column_defs,
         "sizeToFit",
         degree,
     )
 
 
+##################################################################
 # Run the app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
