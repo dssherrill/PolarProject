@@ -28,8 +28,7 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(name)s: %(message)s"
 )
 
-# define global variable
-df_out = None
+# Production mode flag and glider cache
 _production_mode = True
 _glider_cache = {}  # Cache for Glider instances to avoid duplicate CSV parsing
 
@@ -159,6 +158,7 @@ app.layout = dbc.Container(
     [
         dcc.Store(id="user-data-store", storage_type="localStorage"),
         dcc.Store(id="working-data-store", storage_type="localStorage"),
+        dcc.Store(id="df-out-store", storage_type="localStorage"),
         dbc.Row(
             [
                 dbc.Col(
@@ -783,6 +783,7 @@ def process_unit_change(
     Output(component_id="mcAgGrid", component_property="columnDefs"),
     Output(component_id="mcAgGrid", component_property="columnSize"),
     Output(component_id="poly-degree", component_property="value"),
+    Output("df-out-store", "data"),
     Input("working-data-store", "data"),
     Input(component_id="poly-degree", component_property="value"),
     Input(component_id="glider-dropdown", component_property="value"),
@@ -792,6 +793,7 @@ def process_unit_change(
     Input(component_id="toggle-switch-dump", component_property="value"),
     State(component_id="radio-units", component_property="value"),
     State(component_id="radio-weight-or-loading", component_property="value"),
+    State("df-out-store", "data"),
 )
 def update_graph(
     data,
@@ -803,6 +805,7 @@ def update_graph(
     write_excel_file,
     units,
     weight_or_loading,
+    df_out_data,
 ):
     """
     Update the polar and Speed-to-Fly graphs, compute MacCready table rows in the selected units,
@@ -817,9 +820,11 @@ def update_graph(
         show_debug_graphs (bool): If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
         write_excel_file (bool): If true, append STF results for the current degree to an Excel file named "<glider> stf.xlsx".
         units (str): Unit system key, either 'Metric' or 'US', used to select display units for speed, sink, and weight.
+        weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
+        df_out_data (dict): Stored df_out data from localStorage for displaying saved STF results on graph.
 
     Returns:
-        tuple: Eight items matching the Dash outputs in order:
+        tuple: Nine items matching the Dash outputs in order:
             - displayed glider name (str)
             - status and informational messages from the polar model (str)
             - polar plot figure (plotly.graph_objs.Figure)
@@ -828,8 +833,10 @@ def update_graph(
             - AG Grid column definitions for the MacCready table (list[dict])
             - AG Grid column sizing mode (str), e.g. "sizeToFit"
             - effective polynomial degree actually used (int)
+            - updated df_out data (dict) for localStorage
     """
-    global df_out
+    # Load df_out from store or initialize to None
+    df_out = pd.DataFrame(df_out_data) if df_out_data else None
 
     if not write_excel_file:
         df_out = None  # reset accumulated data if not writing to Excel
@@ -1153,6 +1160,9 @@ def update_graph(
 
     polar_graph.update_yaxes(tickformat=".1f", secondary_y=False)
 
+    # Convert df_out to dict for storage, or None if df_out is None
+    df_out_data_return = df_out.to_dict("list") if df_out is not None else None
+
     logger.debug("update_graph return\n")
     return (
         glider_name,
@@ -1163,6 +1173,7 @@ def update_graph(
         new_column_defs,
         "sizeToFit",
         degree,
+        df_out_data_return,
     )
 
 
