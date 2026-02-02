@@ -18,11 +18,12 @@ PolarProject calculates and visualizes glider performance based on **polar curve
   - **Key methods**: `goal_function()`, `sink()`, `MacCready()`
   - Supports two goal functions: "Reichmann" (minimum time) and "Test" (max avg speed)
 
-**[polar_ui.py](polar_ui.py)** - Dash web UI (536 lines)
+**[polar_ui.py](polar_ui.py)** - Dash web UI (~1200 lines)
 - `load_polar()` function: Orchestrates calculation and returns DataFrame for display
 - Plotly graphs with dual-axis support (speed vs. sink, speed-to-fly curves)
 - AG Grid table for MacCready results
 - Responsive Flexbox layout with Dash Bootstrap Components
+- Radio control for pilot weight input or wing loading selection (recent feature)
 
 **[units.py](units.py)** - Centralized unit registry  
 - **Critical**: Single `ureg` instance must be imported globally (not created locally)
@@ -30,8 +31,9 @@ PolarProject calculates and visualizes glider performance based on **polar curve
 - Enables Pint PintArray columns in DataFrames
 
 **[datafiles/gliderInfo.json](datafiles/gliderInfo.json)** - Glider configuration  
-- Defines available gliders: ASK 21, ASW 28, Duo Discus T, SGS 1-26
-- Metadata: `referenceWeight`, `emptyWeight`, `polarFileName`, `fitStart/fitEnd`
+- Defines available gliders: ASK 21, ASW 28, Duo Discus T, JS3 JET, SGS 1-34C, Ventus 2cT
+- Metadata: `name`, `wingArea`, `referenceWeight`, `emptyWeight`, `polarFileName`, `polarSpeedUnits`, `polarSinkUnits`
+- Each glider has reference weight (used for polynomial scaling) and empty weight (base for pilot additions)
 
 **[datafiles/\*.csv](datafiles/)** - WebPlotDigitizer exports  
 - Format: Speed, Sink (any and all sensible units allowed)
@@ -121,13 +123,22 @@ Use `pint_*_demo.py` files for unit/dataframe examples (exploration scripts, not
 
 - **Units must flow through pipelines**: Don't strip `.magnitude` unless absolutely necessary; let Pint track them.
 - **Weight factor applies non-linearly**: Affects both sink rate and all derived metrics.
-- **CSV format strict**: Speed (col 1), Sink (col 2). No header row.
-- **Goal functions differ**: Reichmann minimizes time to reach a goal; "Mine" maximizes average speed accounting for wind.
-- **fsolve() initial guess matters**: Currently 50 knots; may need adjustment for edge cases.
+- **CSV format strict**: Speed (col 1), Sink (col 2). No header row. Stall-speed data points near min speed are filtered out.
+- **Goal functions differ**: Reichmann minimizes time to reach a goal; "Test" maximizes average speed accounting for wind.
+- **fsolve() initial guess matters**: Currently 50 knots; may need adjustment for extreme conditions (e.g., very low MacCready values).
+- **UI calculates STF before graphing**: The speed-to-fly table is computed before the polar curve fit is plotted for display.
+
+## Testing & Debugging
+
+**Test Files** (pytest):
+- `test_polar_ui.py`: Comprehensive UI callback and unit conversion tests
+- `test_glider.py`: Glider class and CSV loading tests
+- `test_glider_additional.py`: Extended glider functionality tests
+
+Run tests via: `pytest test_*.py` or specific file.
 
 ## File Structure Notes
 
-- `test` directory does NOT exist (no formal test suite)
-- `glider.py` appears deprecated; core logic now in `polar_calc.Polar`
-- `*_demo.py` files are exploration/learning aids
-- `.xlsx` files are manual analysis outputs (not part of build)
+- `glider.py`: Still active—loads CSV polars and provides glider metadata; used by both `polar_ui.py` and `polar_calc.py`
+- `.xlsx` files: Manual analysis outputs (not part of build)
+- `.json` files in `datafiles/`: WebPlotDigitizer project exports (historical; CSVs are the authoritative format)

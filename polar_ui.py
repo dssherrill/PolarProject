@@ -119,8 +119,8 @@ initial_glider_data = pd.DataFrame(
             "Gross Weight",
             "Wing Loading",
         ],
-        "Metric": ["1 kg", "2 kg", "3 kg", "4 kg", "5 kg/m²"],
-        "US": ["0 lbs", "0 lbs", "0 lbs", "0 lbs", "0 lb/ft²"],
+        "Metric": ["-- kg", "-- kg", "-- kg", "-- kg", "-- kg/m²"],
+        "US": ["-- lbs", "-- lbs", "-- lbs", "-- lbs", "-- lb/ft²"],
     },
 )
 
@@ -158,6 +158,7 @@ full_width_class = "d-flex w-100 justify-content-left bg-light"  # p-3"
 app.layout = dbc.Container(
     [
         dcc.Store(id="user-data-store", storage_type="localStorage"),
+        dcc.Store(id="working-data-store", storage_type="localStorage"),
         dbc.Row(
             [
                 dbc.Col(
@@ -236,17 +237,21 @@ app.layout = dbc.Container(
                             ],
                             className="mb-3",
                         ),
+                        #
+                        #  One of the next two inputs, either pilot weight or wing loading, will be shown
+                        # but not both.
+                        #
                         dbc.Row(
                             [
                                 # --- pilot weight
                                 dbc.Label(
                                     "Pilot + Ballast weight (kg):",
-                                    html_for="pilot-weight-or-wing-loading-input",
-                                    id="pilot-weight-or-wing-loading-label",
+                                    html_for="pilot-weight-input",
+                                    id="pilot-weight-label",
                                     style={"margin-top": "15px", "width": 450},
                                 ),
                                 dcc.Input(
-                                    id="pilot-weight-or-wing-loading-input",
+                                    id="pilot-weight-input",
                                     type="number",
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
@@ -254,6 +259,27 @@ app.layout = dbc.Container(
                                 ),
                             ],
                             className="mb-3",
+                            id="pilot-weight-row",
+                        ),
+                        dbc.Row(
+                            [
+                                # --- wing loading
+                                dbc.Label(
+                                    "Wing Loading (kg/m²)",
+                                    html_for="wing-loading-input",
+                                    id="wing-loading-label",
+                                    style={"margin-top": "15px", "width": 450},
+                                ),
+                                dcc.Input(
+                                    id="wing-loading-input",
+                                    type="number",
+                                    placeholder="100",
+                                    style={"margin-end": 100, "width": 450},
+                                    debounce=0.75,
+                                ),
+                            ],
+                            className="mb-3",
+                            id="wing-loading-row",
                         ),
                         dbc.Row(
                             [
@@ -394,6 +420,7 @@ app.layout = dbc.Container(
                                         dcc.Input(
                                             id="airmass-horizontal-speed",
                                             type="number",
+                                            value=0,
                                             placeholder="0",
                                             debounce=0.75,
                                         ),
@@ -402,11 +429,14 @@ app.layout = dbc.Container(
                                 dbc.Row(
                                     [
                                         dbc.Label(
-                                            "Vertical speed", id="vertical-speed-label"
+                                            "Vertical speed",
+                                            id="vertical-speed-label",
+                                            html_for="airmass-vertical-speed",
                                         ),
                                         dcc.Input(
                                             id="airmass-vertical-speed",
                                             type="number",
+                                            value=0,
                                             placeholder="0",
                                             debounce=0.75,
                                         ),
@@ -440,7 +470,7 @@ app.layout = dbc.Container(
                         ),
                         dbc.Label(
                             "MacCready Value for Goal Function debug graph",
-                            html_for="ref-weight-input",
+                            html_for="maccready-input",
                             className="w-2",
                         ),
                         html.Br(),
@@ -484,26 +514,22 @@ app.layout = dbc.Container(
     Output(component_id="glider_AgGrid", component_property="rowData"),
     Output(component_id="horizontal-speed-label", component_property="children"),
     Output(component_id="vertical-speed-label", component_property="children"),
-    Output(
-        component_id="pilot-weight-or-wing-loading-label", component_property="children"
-    ),
-    Output(
-        component_id="pilot-weight-or-wing-loading-input",
-        component_property="placeholder",
-    ),
-    Output(
-        component_id="pilot-weight-or-wing-loading-input", component_property="value"
-    ),
-    Output(component_id="pilot-weight-or-wing-loading-input", component_property="min"),
+    Output(component_id="pilot-weight-label", component_property="children"),
+    Output(component_id="pilot-weight-input", component_property="placeholder"),
+    Output(component_id="pilot-weight-input", component_property="value"),
+    Output(component_id="wing-loading-label", component_property="children"),
+    Output(component_id="wing-loading-input", component_property="placeholder"),
+    Output(component_id="wing-loading-input", component_property="value"),
+    Output(component_id="wing-loading-input", component_property="min"),
     Output(component_id="airmass-horizontal-speed", component_property="value"),
     Output(component_id="airmass-vertical-speed", component_property="value"),
     Output("user-data-store", "data"),
+    Output("working-data-store", "data"),
     Input(component_id="radio-units", component_property="value"),
     Input(component_id="radio-weight-or-loading", component_property="value"),
     Input(component_id="glider-dropdown", component_property="value"),
-    Input(
-        component_id="pilot-weight-or-wing-loading-input", component_property="value"
-    ),
+    Input(component_id="pilot-weight-input", component_property="value"),
+    Input(component_id="wing-loading-input", component_property="value"),
     Input(component_id="airmass-horizontal-speed", component_property="value"),
     Input(component_id="airmass-vertical-speed", component_property="value"),
     State(component_id="user-data-store", component_property="data"),
@@ -513,51 +539,55 @@ def process_unit_change(
     units,
     weight_or_loading,
     glider_name,
-    pilot_weight_or_wing_loading_in,
+    pilot_weight_in,
+    wing_loading_in,
     v_air_horiz_in,
     v_air_vert_in,
     data,
 ):
     """
-    Update UI labels, placeholders, displayed glider data, and stored user settings when the selected unit system or weight input mode changes.
-
-    Parameters:
-        units (str): Key from UNIT_CHOICES selecting unit group ("Metric" or "US").
-        weight_or_loading (str): Active weight input mode, either "Pilot Weight" or "Wing Loading".
-        glider_name (str or None): Selected glider name; defaults to DEFAULT_GLIDER_NAME if falsy.
-        pilot_weight_or_wing_loading_in (float or None): Numeric value entered by the user for the active weight mode in the selected units (None to leave unchanged).
-        v_air_horiz_in (float or None): Horizontal airmass speed entered by the user in the selected speed units (None to leave unchanged).
-        v_air_vert_in (float or None): Vertical airmass (sink) speed entered by the user in the selected sink units (None to leave unchanged).
-        data (dict or None): Stored user data with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert"; existing values are used when inputs are None.
-
+    Process unit changes and update glider parameters based on user input.
+    Handles unit system selection and manages pilot weight/wing loading inputs,
+    converting between different unit systems and calculating derived values.
+    Args:
+        units (str): Selected unit system (e.g., 'Metric', 'US').
+        weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
+        glider_name (str): Name of the selected glider.
+        pilot_weight_in (float): Pilot weight input value in selected units.
+        wing_loading_in (float): Wing loading input value in selected units.
+        v_air_horiz_in (float): Horizontal airmass speed input in selected units.
+        v_air_vert_in (float): Vertical airmass speed input in selected units.
+        data (dict): Stored state data containing pilot_weight, wing_loading, v_air_horiz, v_air_vert.
     Returns:
-        tuple: (
-            glider_grid_records (list[dict]): Rows for the glider AgGrid with Metric and US formatted values,
-            horizontal_speed_label (str): Label text for the horizontal speed input (includes unit),
-            vertical_speed_label (str): Label text for the vertical speed input (includes unit),
-            weight_label (str): Label text for the weight input reflecting the active mode and units,
-            weight_placeholder (str): Placeholder string for the weight input showing the reference value,
-            weight_value (float or None): Numeric value to populate the weight input in the selected units, rounded to 0.1, or None,
-            v_air_horiz_out (float or None): Stored horizontal airmass speed converted to the selected speed units and rounded to 0.1, or None,
-            v_air_vert_out (float or None): Stored vertical airmass speed converted to the selected sink units and rounded to 0.1, or None,
-            updated_data (dict): Updated stored values with keys "pilot_weight" (kg or None), "wing_loading" (kg/m^2 or None), "v_air_horiz" (m/s or None), "v_air_vert" (m/s or None)
-        )
+        tuple: A tuple containing:
+            - glider_data (list): DataFrame records with glider weight and loading specifications.
+            - horizontal_speed_label (str): Label for horizontal speed input field.
+            - vertical_speed_label (str): Label for vertical speed input field.
+            - pilot_weight_label (str): Label for pilot weight input field.
+            - pilot_weight_placeholder (str): Placeholder text for pilot weight input.
+            - pilot_weight_value (float): Current pilot weight value in selected units.
+            - wing_loading_label (str): Label for wing loading input field.
+            - wing_loading_placeholder (str): Placeholder text for wing loading input.
+            - wing_loading_value (float): Current wing loading value in selected units.
+            - min_wing_loading_display (float): Minimum wing loading constraint.
+            - v_air_horiz (float): Horizontal airmass speed in m/s.
+            - v_air_vert (float): Vertical airmass speed in m/s.
+            - data_store (dict): Updated state dictionary with current values.
+    Raises:
+        dash.exceptions.PreventUpdate: If no glider is selected or glider info is empty.
     """
+    logger.info(
+        f"process_unit_change called with units={units}, weight_or_loading={weight_or_loading}, glider_name={glider_name}, pilot_weight_in={pilot_weight_in}, wing_loading_in={wing_loading_in}, v_air_horiz_in={v_air_horiz_in}, v_air_vert_in={v_air_vert_in}, data={data}"
+    )
     logger.debug(f"process_unit_change called _production_mode={_production_mode}")
 
-    # Use default glider if none selected
-    glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
-    current_glider_info = df_glider_info[df_glider_info["name"] == glider_name]
-
-    # Just return if no glider selected
-    if current_glider_info.empty:
-        raise dash.exceptions.PreventUpdate
-
-    # Fetch stored values or initialize to None
-    pilot_weight = data.get("pilot_weight") if data else None
-    wing_loading = data.get("wing_loading") if data else None
-    v_air_horiz = data.get("v_air_horiz") if data else None
-    v_air_vert = data.get("v_air_vert") if data else None
+    # Show the selected input box; hide the other input box
+    if weight_or_loading == "Pilot Weight":
+        set_props("pilot-weight-row", {"className": "mb-3"})
+        set_props("wing-loading-row", {"className": "d-none"})
+    else:
+        set_props("wing-loading-row", {"className": "mb-3"})
+        set_props("pilot-weight-row", {"className": "d-none"})
 
     # setup units
     selected_units = UNIT_CHOICES[units]
@@ -566,96 +596,96 @@ def process_unit_change(
     sink_units = selected_units["Sink"]
     pressure_units = selected_units["Pressure"]
 
-    set_props("toggle-switch-dump", {"disabled": _production_mode})
+    # Use default glider if none selected
+    glider_name = glider_name if glider_name else DEFAULT_GLIDER_NAME
+    current_glider_info = df_glider_info[df_glider_info["name"] == glider_name]
+
+    # Just return if glider data is not available
+    if current_glider_info.empty:
+        raise dash.exceptions.PreventUpdate
 
     # Get or create cached Glider instance to avoid duplicate CSV parsing
     current_glider = get_cached_glider(glider_name, current_glider_info)
-    reference_pilot_weight = (
-        current_glider.referenceWeight() - current_glider.emptyWeight()
-    )
 
-    # require pilot weight to be non-negative
-    min_wing_loading = (
-        current_glider.emptyWeight() / current_glider.wingArea()
-    ).magnitude
+    # Fetch stored values or initialize to None
+    pilot_weight = data.get("pilot_weight") if data else None
+    wing_loading = data.get("wing_loading") if data else None
+    v_air_horiz = data.get("v_air_horiz") if data else 0.0
+    v_air_vert = data.get("v_air_vert") if data else 0.0
 
-    min_wing_loading_display = math.ceil(
-        (min_wing_loading * ureg("kg/m**2")).to(pressure_units).magnitude
-    )
-
-    # capture the pilot weight or wing loading input value each time it changes
-    if dash.ctx.triggered_id == "pilot-weight-or-wing-loading-input":
-        logger.debug("pilot-weight-or-wing-loading-input clicked")
-        if weight_or_loading == "Pilot Weight":
-            if pilot_weight_or_wing_loading_in is None:
-                pilot_weight = None
-                wing_loading = None
-            else:
-                pilot_weight = (
-                    (pilot_weight_or_wing_loading_in * weight_units).to("kg").magnitude
-                )
-                gross_weight = current_glider.emptyWeight().magnitude + pilot_weight
-                wing_loading = gross_weight / current_glider.wingArea().magnitude
-        elif weight_or_loading == "Wing Loading":
-            if pilot_weight_or_wing_loading_in is None:
-                pilot_weight = None
-                wing_loading = None
-            else:
-                wing_loading = (
-                    (pilot_weight_or_wing_loading_in * pressure_units)
-                    .to("kg/m**2")
-                    .magnitude
-                )
-
-                if wing_loading < min_wing_loading:
-                    wing_loading = min_wing_loading  # adjust to minimum
-                gross_weight = wing_loading * current_glider.wingArea().magnitude
-                pilot_weight = gross_weight - current_glider.emptyWeight().magnitude
-
-    pilot_weight_or_wing_loading_label = (
-        f"Pilot + Ballast weight ({weight_units.units:~P}):"
-        if weight_or_loading == "Pilot Weight"
-        else f"Wing Loading ({pressure_units.units:~P}), min {min_wing_loading_display:.0f} {pressure_units.units:~P}:"
-    )
-
-    pilot_weight_or_wing_loading_value = (
-        round((pilot_weight * ureg("kg")).to(weight_units).magnitude, 1)
-        if (weight_or_loading == "Pilot Weight" and pilot_weight is not None)
-        else (
-            round((wing_loading * ureg("kg/m**2")).to(pressure_units).magnitude, 1)
-            if (weight_or_loading == "Wing Loading" and wing_loading is not None)
-            else None
-        )
-    )
-
-    pilot_weight_or_wing_loading_placeholder = (
-        f"{reference_pilot_weight.to(weight_units).magnitude:.1f}"
-        if weight_or_loading == "Pilot Weight"
-        else f"{current_glider.referenceWingLoading().to(pressure_units).magnitude:.1f}"
-    )
-
-    # pilot_weight must remain "None" until set by the user
-    # this allows the reference pilot weight to be used until an actual pilot weight is entered
+    # Default to reference values if not set.
+    # Reference values for weight and wing loading are those for the original the polar chart
     working_pilot_weight = (
         pilot_weight * ureg("kg")
         if pilot_weight is not None
-        else reference_pilot_weight
+        else current_glider.reference_pilot_weight()
     )
-
     working_wing_loading = (
         wing_loading * ureg("kg/m**2")
         if wing_loading is not None
-        else current_glider.referenceWingLoading()
+        else current_glider.reference_wing_loading()
     )
 
-    gross_weight = current_glider.emptyWeight() + working_pilot_weight
+    set_props("toggle-switch-dump", {"disabled": _production_mode})
+
+    # require pilot weight to be non-negative
+    min_wing_loading = current_glider.empty_weight() / current_glider.wing_area()
+
+    # this gets used in the wing loading input label and min attribute
+    min_wing_loading_display = f"{min_wing_loading.to(pressure_units).magnitude:.1f}"
+
+    # capture the pilot weight each time it changes
+    if dash.ctx.triggered_id == "pilot-weight-input":
+        logger.debug("pilot-weight-input")
+        # Process pilot weight input and compute wing loading to match
+        if pilot_weight_in is None:
+            pilot_weight = None  # must remain "None" until set by the user
+            wing_loading = None
+        else:
+            working_pilot_weight = (pilot_weight_in * weight_units).to("kg")
+            pilot_weight = working_pilot_weight.magnitude
+
+            # Compute wing loading from pilot weight
+            gross_weight = current_glider.empty_weight() + working_pilot_weight
+            working_wing_loading = gross_weight / current_glider.wing_area()
+            wing_loading = working_wing_loading.magnitude
+
+    # capture wing loading input value each time it changes
+    if dash.ctx.triggered_id == "wing-loading-input":
+        logger.debug("wing-loading-input")
+        # Process wing loading input and compute pilot weight to match
+        if wing_loading_in is None:
+            pilot_weight = None
+            wing_loading = None  # must remain "None" until set by the user
+        else:
+            working_wing_loading = (wing_loading_in * pressure_units).to("kg/m**2")
+            if working_wing_loading < min_wing_loading:
+                working_wing_loading = min_wing_loading  # adjust to minimum
+            wing_loading = working_wing_loading.magnitude
+
+            # Compute pilot weight from wing loading
+            gross_weight = working_wing_loading * current_glider.wing_area()
+            working_pilot_weight = gross_weight - current_glider.empty_weight()
+            pilot_weight = working_pilot_weight.magnitude
+
+    pilot_weight_label = f"Pilot + Ballast weight ({weight_units.units:~P}):"
+    wing_loading_label = f"Wing Loading ({pressure_units.units:~P}), min {min_wing_loading_display} {pressure_units.units:~P}:"
+
+    pilot_weight_placeholder = (
+        f"{current_glider.reference_pilot_weight().to(weight_units).magnitude:.1f}"
+    )
+    wing_loading_placeholder = (
+        f"{current_glider.reference_wing_loading().to(pressure_units).magnitude:.1f}"
+    )
+
+    gross_weight = current_glider.empty_weight() + working_pilot_weight
 
     # capture the horizontal airmass speed each time it changes
     if dash.ctx.triggered_id == "airmass-horizontal-speed":
         logger.debug("airmass-horizontal-speed clicked")
 
         if v_air_horiz_in is None:
-            v_air_horiz = None
+            v_air_horiz = 0.0
         else:
             v_air_horiz = (v_air_horiz_in * speed_units).to("m/s").magnitude
 
@@ -663,10 +693,11 @@ def process_unit_change(
     if dash.ctx.triggered_id == "airmass-vertical-speed":
         logger.debug("airmass-vertical-speed clicked")
         if v_air_vert_in is None:
-            v_air_vert = None
+            v_air_vert = 0.0
         else:
             v_air_vert = (v_air_vert_in * sink_units).to("m/s").magnitude
 
+    # Assemble glider data for display
     glider_data = pd.DataFrame(
         {
             "Label": [
@@ -677,15 +708,15 @@ def process_unit_change(
                 "Wing Loading",
             ],
             "Metric": [
-                f"{current_glider.referenceWeight():.1f~P}",
-                f"{current_glider.emptyWeight():.1f~P}",
+                f"{current_glider.reference_weight():.1f~P}",
+                f"{current_glider.empty_weight():.1f~P}",
                 f"{working_pilot_weight:.1f~P}",
                 f"{gross_weight:.1f~P}",
                 f"{working_wing_loading:.1f~P}",
             ],
             "US": [
-                f"{current_glider.referenceWeight().to(US_UNITS['Weight']):.1f~P}",
-                f"{current_glider.emptyWeight().to(US_UNITS['Weight']):.1f~P}",
+                f"{current_glider.reference_weight().to(US_UNITS['Weight']):.1f~P}",
+                f"{current_glider.empty_weight().to(US_UNITS['Weight']):.1f~P}",
                 f"{working_pilot_weight.to(US_UNITS['Weight']):.1f~P}",
                 f"{gross_weight.to(US_UNITS['Weight']):.1f~P}",
                 f"{(working_wing_loading.to(US_UNITS['Pressure'])):.1f~P}",
@@ -693,14 +724,30 @@ def process_unit_change(
         }
     )
 
+    # Setting one changes the other, so we need to show both values if either is set
+    weight_and_loading_none = pilot_weight_in is None and wing_loading_in is None
+
     return (
         glider_data.to_dict("records"),
         f"Horizontal speed ({selected_units['Speed'].units:~P}):",
         f"Vertical speed ({selected_units['Sink'].units:~P}):",
-        pilot_weight_or_wing_loading_label,
-        pilot_weight_or_wing_loading_placeholder,
-        pilot_weight_or_wing_loading_value,
-        (0.0 if weight_or_loading == "Pilot Weight" else min_wing_loading_display),
+        pilot_weight_label,
+        pilot_weight_placeholder,
+        # Pilot weight display value
+        (
+            None
+            if weight_and_loading_none
+            else round(working_pilot_weight.to(weight_units).magnitude, 1)
+        ),
+        wing_loading_label,
+        wing_loading_placeholder,
+        # Wing loading display value
+        (
+            None
+            if weight_and_loading_none
+            else round(working_wing_loading.to(pressure_units).magnitude, 1)
+        ),
+        float(min_wing_loading_display),
         (
             round((v_air_horiz * ureg("m/s")).to(speed_units).magnitude, 1)
             if v_air_horiz is not None
@@ -714,15 +761,19 @@ def process_unit_change(
         {
             "pilot_weight": pilot_weight,
             "wing_loading": wing_loading,
-            "v_air_horiz": v_air_horiz if v_air_horiz is not None else None,
-            "v_air_vert": v_air_vert if v_air_vert is not None else None,
+            "v_air_horiz": v_air_horiz,
+            "v_air_vert": v_air_vert,
+        },
+        {
+            "pilot_weight": working_pilot_weight.magnitude,
+            "wing_loading": working_wing_loading.magnitude,
+            "v_air_horiz": v_air_horiz,
+            "v_air_vert": v_air_vert,
         },
     )
 
 
 ##################################################################
-
-
 @callback(
     Output(component_id="main-title", component_property="children"),
     Output(component_id="statistics", component_property="children"),
@@ -732,7 +783,7 @@ def process_unit_change(
     Output(component_id="mcAgGrid", component_property="columnDefs"),
     Output(component_id="mcAgGrid", component_property="columnSize"),
     Output(component_id="poly-degree", component_property="value"),
-    Input("user-data-store", "data"),
+    Input("working-data-store", "data"),
     Input(component_id="poly-degree", component_property="value"),
     Input(component_id="glider-dropdown", component_property="value"),
     Input(component_id="maccready-input", component_property="value"),
@@ -740,6 +791,7 @@ def process_unit_change(
     Input(component_id="toggle-switch-debug", component_property="value"),
     Input(component_id="toggle-switch-dump", component_property="value"),
     State(component_id="radio-units", component_property="value"),
+    State(component_id="radio-weight-or-loading", component_property="value"),
 )
 def update_graph(
     data,
@@ -750,6 +802,7 @@ def update_graph(
     show_debug_graphs,
     write_excel_file,
     units,
+    weight_or_loading,
 ):
     """
     Update the polar and Speed-to-Fly graphs, compute MacCready table rows in the selected units,
@@ -778,6 +831,9 @@ def update_graph(
     """
     global df_out
 
+    if not write_excel_file:
+        df_out = None  # reset accumulated data if not writing to Excel
+
     logger.info(f"data from store: {data}")
 
     # Use default glider if none selected
@@ -786,18 +842,27 @@ def update_graph(
 
     # Just return if no glider selected
     if current_glider_info.empty:
+        logger.error("update_graph: glider data not found")
         raise dash.exceptions.PreventUpdate
 
     # Get or create cached Glider instance to avoid duplicate CSV parsing
     current_glider = get_cached_glider(glider_name, current_glider_info)
 
     # Fetch stored values or initialize to None
+    if data is None:
+        logger.error("update_graph: no data in working-data-store")
+        raise dash.exceptions.PreventUpdate
+
     pilot_weight = data.get("pilot_weight") if data else None
     wing_loading = data.get("wing_loading") if data else None
     v_air_horiz = data.get("v_air_horiz") if data else None
     v_air_vert = data.get("v_air_vert") if data else None
+
     logger.info(
-        f"glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, wing_loading: {wing_loading}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}"
+        f"update_graph, from working-data-store: pilot_weight: {pilot_weight}, wing_loading: {wing_loading}, v_air_horiz: {v_air_horiz}, v_air_vert: {v_air_vert}"
+    )
+    logger.info(
+        f"update_graph input parameters: glider: {glider_name}, degree: {degree}, units: {units}, maccready: {maccready}, pilot_weight: {pilot_weight}, wing_loading: {wing_loading}, goal_function: {goal_function}, Ax: {v_air_horiz}, Ay: {v_air_vert}, debug: {show_debug_graphs}, Excel: {write_excel_file}"
     )
 
     # Setup units
@@ -805,18 +870,13 @@ def update_graph(
     sink_units = selected_units["Sink"]
     speed_units = selected_units["Speed"]
     weight_units = selected_units["Weight"]
+    pressure_units = selected_units["Pressure"]
 
     if degree is None:
         degree = DEFAULT_POLYNOMIAL_DEGREE
 
     if maccready is None:
         maccready = 0.0
-
-    if v_air_horiz is None:
-        v_air_horiz = 0.0
-
-    if v_air_vert is None:
-        v_air_vert = 0.0
 
     # Set the units for unitless items from the data store
     maccready = (maccready * sink_units).to("m/s")
@@ -830,6 +890,13 @@ def update_graph(
         current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight
     )
     weight_factor = current_polar.get_weight_factor()
+
+    # This label is used in legends for both the polar graph and the STF graph
+    graph_trace_label = (
+        (f"{current_polar.get_weight_fly().to(weight_units):.1f~P}")
+        if weight_or_loading == "Pilot Weight"
+        else (f"{(wing_loading * ureg('kg/m**2')).to(pressure_units):.1f~P}")
+    )
 
     ##################################################################
     # Graph Speed-to-Fly vs. MC setting
@@ -851,17 +918,32 @@ def update_graph(
         secondary_y=False,
     )
 
-    ##################################################################
+    # Add the saved STF results to the graph
+    if df_out is not None:
+        for column in df_out.columns:
+            if column == "MC":
+                continue
+            trace_saved_stf = go.Scatter(
+                x=df_out["MC"],
+                y=df_out[column],
+                name=f"{column}",
+                mode="lines",
+                line=dict(dash="dot"),
+            )
+            stf_graph.add_trace(
+                trace_saved_stf,
+                secondary_y=False,
+            )
+
     # Collect results if Excel output requested
     if write_excel_file:
         if df_out is None:
             df_out = pd.DataFrame(df_mc_graph["MC"].pint.to(sink_units).pint.magnitude)
             logger.debug("created df_out")
-        column_name = f"Degree {degree}"
+        column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
         df_out[column_name] = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
 
         logger.debug(df_out.columns)
-        # df_out[f'degree {degree}'] = df_mc['STF'].pint.to(speed_units).pint.magnitude
 
         # Save results externally
         # Open the file in write mode ('w') with newline=''
@@ -869,15 +951,11 @@ def update_graph(
         df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
 
         logger.info(f'File "{excel_outfile_name}" created successfully')
-    else:
-        # Delete any accumulated data
-        df_out = None
-
     ###################################################################
     # Plot average speed vs. MC setting
     # Clip Vavg to stay on the STF graph without expanding the Y axis too much
     plot_max = max(df_mc_graph["STF"].pint.to(speed_units).pint.magnitude)
-    y = df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
+    y = df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude.copy()
     y[(y <= -50.0) | (y >= plot_max)] = np.nan
     trace_stf = go.Scatter(
         x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
@@ -1042,7 +1120,7 @@ def update_graph(
         trace_weight_adjusted = go.Scatter(
             x=speed * weight_factor,
             y=sink * weight_factor,
-            name=f"Adjusted to {current_polar.get_weight_fly().to(weight_units).magnitude:.1f} {weight_units.units:~P}",
+            name=graph_trace_label,
         )
         polar_graph.add_trace(trace_weight_adjusted)
     """
