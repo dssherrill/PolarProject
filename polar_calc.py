@@ -43,7 +43,7 @@ class Polar:
             goal (str): Goal selector used by the instance's goal_function (e.g., "Reichmann", "Test").
             v_air_horiz: Horizontal component of ambient airspeed (quantity expected by caller).
             v_air_vert: Vertical component of ambient airspeed (quantity expected by caller).
-            pilot_weight (optional): Pilot weight to add to empty weight (quantity with units,
+            pilot_weight (optional): Pilot weight to add to empty weight (float in kg units,
                 if omitted the glider's reference weight is used).
 
         Side effects:
@@ -70,7 +70,9 @@ class Polar:
             self.__messages += msg + "\n"
             self.__weight_factor = 1.0
         else:
-            ratio = (self.__weight_fly / current_glider.reference_weight()).to_base_units()
+            ratio = (
+                self.__weight_fly / current_glider.reference_weight()
+            ).to_base_units()
             self.__weight_factor = np.sqrt(ratio.magnitude)
 
         self.fit_polar(degree)
