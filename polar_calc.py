@@ -55,26 +55,23 @@ class Polar:
         self.__goal_selection = goal
         self.__v_air_horiz = v_air_horiz
         self.__v_air_vert = v_air_vert
-        #        self.__ref_weight = current_glider['referenceWeight'].iloc[0]
-        #        self.__empty_weight = current_glider['emptyWeight'].iloc[0]
         self.__weight_fly = (
-            current_glider.emptyWeight() + pilot_weight * ureg("kg")
+            current_glider.empty_weight() + pilot_weight * ureg("kg")
             if pilot_weight is not None
-            else current_glider.referenceWeight()
+            else current_glider.reference_weight()
         )
 
         self.__messages = ""
 
         # Weight factor used to scale the polar sink rates
-        if current_glider.referenceWeight() == 0:
+        if current_glider.reference_weight() == 0:
             msg = "Reference weight is zero; forcing weight factor to 1.0"
             logger.error(msg)
             self.__messages += msg + "\n"
             self.__weight_factor = 1.0
         else:
-            self.__weight_factor = np.sqrt(
-                self.__weight_fly.magnitude / current_glider.referenceWeight().magnitude
-            )
+            ratio = (self.__weight_fly / current_glider.reference_weight()).to_base_units()
+            self.__weight_factor = np.sqrt(ratio.magnitude)
 
         self.fit_polar(degree)
 
@@ -267,7 +264,13 @@ class Polar:
         self.__sink_poly, (SSE, _rank, _sv, _rcond) = Poly.fit(
             speed[start_index:], sink[start_index:], degree, full=True
         )
-        logger.debug(f"Fitted polar polynomial coefficients: {self.__sink_poly.coef}")
+        # These coefficients are in the scaled domain
+        # logger.debug(f"Fitted polar polynomial coefficients: {self.__sink_poly.coef}")
+
+        # These coefficients are converted to standard polynomial form
+        logger.debug(
+            f"Fitted polar polynomial coefficients: {self.__sink_poly.convert().coef}"
+        )
         self.__sink_deriv_poly = self.__sink_poly.deriv()
 
         # Generate predicted y-values

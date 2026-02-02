@@ -47,12 +47,12 @@ class Glider:
     def load_CSV(self, current_glider, speed_units, sink_units):
         """
         Load polar speed and sink data from a CSV file referenced by the provided glider record and store them as pint-quantified NumPy arrays.
-        
+
         Parameters:
             current_glider (pandas.DataFrame): A one-row DataFrame containing glider metadata; must include a 'polarFileName' column whose first value is the CSV filename located under ./datafiles/.
             speed_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV speed column before converting to meters per second.
             sink_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV sink column before converting to meters per second.
-        
+
         Raises:
             FileNotFoundError: If the CSV file specified by 'polarFileName' cannot be found under ./datafiles/.
             RuntimeError: If an unexpected error occurs while reading the CSV file.
@@ -105,36 +105,77 @@ class Glider:
     def get_sink_data(self):
         return self.__sink_data
 
-    def referenceWeight(self):
+    def reference_weight(self):
         """
         Return the stored reference weight of the glider.
-        
+
         Returns:
             float: Reference weight in kilograms.
         """
         return self.__ref_weight
 
-    def referenceWingLoading(self):
+    def reference_pilot_weight(self):
+        """
+        Compute the glider's reference pilot weight.
+
+        Reference pilot weight is the stored reference weight minus the stored empty weight.
+
+        Returns:
+            pilot_weight (float): Reference pilot weight in kilograms.
+        """
+        return self.__ref_weight - self.__empty_weight
+
+    def reference_wing_loading(self):
         """
         Compute the glider's reference wing loading.
-        
+
         Reference wing loading is the stored reference weight divided by the stored wing area.
-        
+
         Returns:
             wing_loading (float): Reference wing loading in kilograms per square meter (kg/m^2).
         """
         return self.__ref_weight / self.__wing_area
 
-    def emptyWeight(self):
+    def wing_loading(self, pilot_weight):
+        """
+        Compute the wing loading for a given pilot weight.
+
+        Parameters:
+            pilot_weight (pint.Quantity): Pilot weight in kilograms.
+
+        Returns:
+            float or pint.Quantity: Wing loading in kilograms per square meter (kg/m^2)
+        """
+        if pilot_weight is None:
+            return self.reference_wing_loading()
+        else:
+            return (self.__empty_weight + pilot_weight) / self.__wing_area
+
+    def pilot_weight(self, wing_loading):
+        """
+        Compute the pilot weight corresponding to a given wing loading.
+
+        Parameters:
+            wing_loading (pint.Quantity): current wing loading in kilograms per square meter (kg/m^2).
+
+        Returns:
+            pint.Quantity: Pilot weight in kilograms
+        """
+        if wing_loading is None:
+            return self.reference_pilot_weight()
+        else:
+            return (wing_loading * self.__wing_area) - self.__empty_weight
+
+    def empty_weight(self):
         """
         Get the glider's stored empty weight.
-        
+
         Returns:
             empty_weight (float): The empty weight of the glider in kilograms.
         """
         return self.__empty_weight
 
-    def wingArea(self):
+    def wing_area(self):
         return self.__wing_area
 
     def messages(self):
