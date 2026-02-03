@@ -3,5 +3,13 @@ reviews:
   finishing_touches:
     unit_tests:
       enabled: true
-
-      
+  auto_review:
+    enabled: true
+    # Setting 'drafts: true' ensures draft PRs are also reviewed automatically, 
+    # which is often desired for all branches including those under development.
+    drafts: true 
+    # You can also use 'base_branches' to specify which branches the PR must target 
+    # for an automatic review to trigger (e.g., all branches matching 'feature/*')
+    # base_branches:
+    #   - 'feature/*'
+    
