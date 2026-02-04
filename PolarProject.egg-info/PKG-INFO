@@ -1,0 +1,62 @@
+Metadata-Version: 2.4
+Name: PolarProject
+Version: 0.1.0
+Summary: Displays performance charts derived from a glider's polar curve
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: blinker==1.9.0
+Requires-Dist: certifi==2026.1.4
+Requires-Dist: charset-normalizer==3.4.4
+Requires-Dist: click==8.3.1
+Requires-Dist: colorama==0.4.6
+Requires-Dist: dash==3.3.0
+Requires-Dist: dash-bootstrap-components==2.0.4
+Requires-Dist: dash_ag_grid==32.3.4
+Requires-Dist: et_xmlfile==2.0.0
+Requires-Dist: Flask==3.1.2
+Requires-Dist: flexcache==0.3
+Requires-Dist: flexparser==0.4
+Requires-Dist: gunicorn==23.0.0
+Requires-Dist: idna==3.11
+Requires-Dist: importlib_metadata==8.7.1
+Requires-Dist: itsdangerous==2.2.0
+Requires-Dist: Jinja2==3.1.6
+Requires-Dist: MarkupSafe==3.0.3
+Requires-Dist: nest-asyncio==1.6.0
+Requires-Dist: numpy==2.4.1
+Requires-Dist: openpyxl==3.1.5
+Requires-Dist: packaging==25.0
+Requires-Dist: pandas==2.3.3
+Requires-Dist: Pint==0.25.2
+Requires-Dist: Pint-Pandas==0.7.1
+Requires-Dist: platformdirs==4.5.1
+Requires-Dist: plotly==6.5.2
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: pytz==2025.2
+Requires-Dist: requests==2.32.5
+Requires-Dist: retrying==1.4.2
+Requires-Dist: scipy==1.17.0
+Requires-Dist: setuptools==80.9.0
+Requires-Dist: six==1.17.0
+Requires-Dist: typing_extensions==4.15.0
+Requires-Dist: tzdata==2025.3
+Requires-Dist: urllib3==2.6.3
+Requires-Dist: Werkzeug==3.1.5
+Requires-Dist: zipp==3.23.0
+Dynamic: license-file
+
+# PolarProject
+Displays performance charts derived from a glider's polar curve
+
+Calculates speed-to-fly by solving Reichmann's Speed-to-Fly (STF) equation (see 
+"MacCready speed to fly theory.pdf" in this project).
+
+## Resources:
+
+John Cochrane articles
+https://www.johnhcochrane.com/about/soaring
+
+Polar Explorer is an older program that does similar things, but goes well beyond just speed-to-fly.
+https://www.trimill.com/CuSoft/PolarExplorer/index.htm
+
