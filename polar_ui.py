@@ -1,9 +1,11 @@
-import math
+﻿import math
 import os
+import re
 
 import numpy as np
 import dash
-from dash import dcc, html, Input, Output, State, callback, set_props
+from dash import Dash, dcc, html, Input, Output, State, callback, set_props
+
 import dash_bootstrap_components as dbc
 import dash.exceptions
 
@@ -28,6 +30,32 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(name)s: %(message)s"
 )
 
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize a filename by removing invalid filesystem characters.
+
+    Removes or replaces characters that are invalid in Windows/Unix filenames:
+    / \ : * ? " < > |
+
+    Also trims excessive whitespace and limits length to 255 characters.
+
+    Args:
+        filename: The filename string to sanitize
+
+    Returns:
+        Sanitized filename string safe for use in filesystem operations
+    """
+    # Remove invalid filesystem characters: / \ : * ? " < > |
+    sanitized = re.sub(r'[/\\:*?"<>|]', "", filename)
+    # Replace multiple consecutive spaces with a single space
+    sanitized = re.sub(r"\s+", " ", sanitized)
+    # Strip leading/trailing whitespace
+    sanitized = sanitized.strip()
+    # Limit to 255 characters (filesystem limit)
+    sanitized = sanitized[:255]
+    return sanitized
+
+
 # Production mode flag and glider cache
 _production_mode = True
 _glider_cache = {}  # Cache for Glider instances to avoid duplicate CSV parsing
@@ -37,7 +65,9 @@ df_glider_info = pd.read_json("datafiles/gliderInfo.json")
 DEFAULT_GLIDER_NAME = "ASW 28"
 
 # Initialize the Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+# app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
+# app = Dash(external_stylesheets=[dbc.themes.SLATE])
 
 # polynomial fit degree (order)
 DEFAULT_POLYNOMIAL_DEGREE = 5
@@ -147,12 +177,59 @@ item_style = {
 }
 
 graph_style = {
-    # "flex": "1 1 600px",  # grow=1, shrink=1, base_width=800px
+    "flex": "1 1 600px",  # grow=1, shrink=1, base_width=800px
     # "min-width": "300px",
     "min-height": "500px",
 }
 
 full_width_class = "d-flex w-100 justify-content-left bg-light"  # p-3"
+
+
+def add_graph(graph_id):
+    """Create a Graph component with the specified ID."""
+    return html.Div(
+        [
+            dcc.Graph(
+                figure={},
+                id=graph_id,
+            )
+        ],
+    )
+
+
+def add_mc_aggrid():
+    """Create an AG Grid component with the specified ID."""
+    return html.Div(
+        [
+            dag.AgGrid(
+                columnSize="autoSize",
+                dashGridOptions={"domLayout": "autoHeight"},
+                style={"width": "100%"},
+                id="mcAgGrid",
+            )
+        ]
+    )
+
+
+def add_compare_buttons():
+    """Create comparison control buttons for saving and clearing STF results."""
+    return html.Div(
+        [
+            dbc.Button(
+                "Save for Comparison",
+                id="save-comparison-button",
+                className="m-2",
+                # color="secondary",
+            ),
+            dbc.Button(
+                "Clear Comparison",
+                id="clear-comparison-button",
+                className="m-2",
+                # color="secondary",
+            ),
+        ]
+    )
+
 
 # App layout
 app.layout = dbc.Container(
@@ -191,9 +268,8 @@ app.layout = dbc.Container(
                             placeholder="Select a glider...",
                             persistence=True,
                             persistence_type="local",
-                            style={"width": 450},
+                            style={"width": "100%"},
                         ),
-                        html.Div(id="output-container"),
                         dag.AgGrid(
                             rowData=initial_glider_data.to_dict("records"),
                             columnDefs=[
@@ -202,8 +278,9 @@ app.layout = dbc.Container(
                                 {"field": "US"},
                             ],
                             columnSize="autoSize",
+                            dashGridOptions={"domLayout": "autoHeight"},
                             # dashGridOptions={"pagination": False},
-                            style={"height": 300, "width": 450},
+                            style={"width": "100%"},
                             id="glider_AgGrid",
                             # className=full_width_class,
                         ),
@@ -216,13 +293,14 @@ app.layout = dbc.Container(
                                 "margin-top": "15px",
                                 "width": 450,
                             },
+                            className="text-primary fs-4",
                         ),
                         dbc.RadioItems(
                             options=[
                                 "Pilot Weight",
                                 "Wing Loading",
                             ],
-                            value="Pilot Weight",
+                            value="Wing Loading",
                             inline=False,
                             id="radio-weight-or-loading",
                             persistence=True,
@@ -250,6 +328,7 @@ app.layout = dbc.Container(
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
                                     debounce=0.75,
+                                    persistence_type="local",
                                 ),
                             ],
                             className="mb-3",
@@ -273,22 +352,31 @@ app.layout = dbc.Container(
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
                                     debounce=0.75,
+                                    persistence_type="local",
                                 ),
                             ],
                             className="mb-3",
                             id="wing-loading-row",
                         ),
-                        dbc.RadioItems(
-                            options=["Metric", "US"],
-                            value="Metric",
-                            inline=False,
-                            id="radio-units",
-                            persistence=True,
-                            persistence_type="local",
-                            # disabled=True,
+                        html.Div(
+                            [
+                                dbc.Label(
+                                    "Units:",
+                                    className="text-primary fs-4",
+                                ),
+                                dbc.RadioItems(
+                                    options=["Metric", "US"],
+                                    value="Metric",
+                                    inline=False,
+                                    id="radio-units",
+                                    persistence=True,
+                                    persistence_type="local",
+                                    # disabled=True,
+                                ),
+                            ],
                         ),
                     ],
-                    # width=5,
+                    md=3,
                 ),
                 dbc.Col(
                     [
@@ -353,34 +441,7 @@ app.layout = dbc.Container(
         dbc.Row(
             [
                 dbc.Col(
-                    [
-                        html.Div(
-                            [
-                                dbc.ButtonGroup(
-                                    [
-                                        dbc.Button(
-                                            "Save for Comparison",
-                                            color="primary",
-                                            className="m-1 rounded-pill",
-                                            id="save-comparison-button",
-                                            style={"width": "300px"},
-                                        ),
-                                        dbc.Button(
-                                            "Clear Comparisons",
-                                            color="primary",
-                                            className="m-1 rounded-pill",
-                                            id="clear-comparison-button",
-                                            style={"width": "300px"},
-                                        ),
-                                    ],
-                                    className="d-flex flex-wrap justify-content-center",
-                                ),
-                            ],
-                            className="no-wrap",
-                            # className="w-100",
-                        ),  # Uses flexbox utilities for spacing
-                    ],
-                    className="no-wrap",
+                    [add_compare_buttons()],
                 ),
             ],
         ),
@@ -388,40 +449,16 @@ app.layout = dbc.Container(
         dbc.Row(
             [
                 dbc.Col(
-                    dcc.Graph(
-                        figure={},
-                        id="graph-polar",
-                    ),
-                    style=graph_style,
+                    add_graph("graph-polar"),
+                    md=4,
                 ),
                 dbc.Col(
-                    dcc.Graph(
-                        figure={},
-                        id="graph-stf",
-                    ),
-                    style=graph_style,
+                    add_graph("graph-stf"),
+                    md=4,
                 ),
                 dbc.Col(
-                    dag.AgGrid(
-                        rowData=initial_mc_data.to_dict("records"),
-                        columnDefs=[
-                            {
-                                "field": i,
-                                "valueFormatter": {
-                                    "function": "d3.format('.1f')(params.value)"
-                                },
-                                "type": "numericColumn",
-                            }
-                            for i in initial_mc_data.columns
-                        ],
-                        columnSize="autoSize",
-                        dashGridOptions={"pagination": False},
-                        # style={"height": 550, "width": "500px"},  # "width": "100%"},
-                        # style=item_style,
-                        id="mcAgGrid",
-                    ),
-                    # width=4,
-                    className=full_width_class,
+                    add_mc_aggrid(),
+                    md=4,
                 ),
             ],
             className=full_width_class,
@@ -433,7 +470,7 @@ app.layout = dbc.Container(
                 html.Div(
                     "Airmass Movement",
                     # className="text-primary fs-3",
-                    className="d-none",
+                    className="d-none",  # TODO: enable later
                 ),
             ]
         ),
@@ -473,7 +510,7 @@ app.layout = dbc.Container(
             style={
                 "flex": "1 1 100%",
             },
-            className="d-none",
+            className="d-none",  # TODO: enable later
         ),
         dbc.Row(
             [
@@ -525,10 +562,11 @@ app.layout = dbc.Container(
                                     ],
                                 ),
                             ],
-                            className="mb-3",
+                            className="d-none mb-3",  # TODO: consider removing
                         ),
                     ],
-                ),  # width=2),
+                    md=4,
+                ),
             ],
             style={
                 "flex": "1 1 100%",
@@ -537,6 +575,7 @@ app.layout = dbc.Container(
     ],
     style=container_style,
     # className="flex-wrap flex-lg-nowrap",
+    className=full_width_class,
     fluid=True,
 )
 
@@ -671,12 +710,14 @@ def process_unit_change(
     min_wing_loading_display = f"{min_wing_loading.to(pressure_units).magnitude:.1f}"
 
     # capture the pilot weight each time it changes
+    set_weight_and_loading = False
     if dash.ctx.triggered_id == "pilot-weight-input":
         logger.debug("pilot-weight-input")
         # Process pilot weight input and compute wing loading to match
         if pilot_weight_in is None:
             pilot_weight = None  # must remain "None" until set by the user
             wing_loading = None
+            set_weight_and_loading = True
         else:
             working_pilot_weight = (pilot_weight_in * weight_units).to("kg")
             pilot_weight = working_pilot_weight.magnitude
@@ -693,6 +734,7 @@ def process_unit_change(
         if wing_loading_in is None:
             pilot_weight = None
             wing_loading = None  # must remain "None" until set by the user
+            set_weight_and_loading = True
         else:
             working_wing_loading = (wing_loading_in * pressure_units).to("kg/m**2")
             if working_wing_loading < min_wing_loading:
@@ -761,7 +803,9 @@ def process_unit_change(
     )
 
     # Setting one changes the other, so we need to show both values if either is set
-    weight_and_loading_none = pilot_weight_in is None and wing_loading_in is None
+    weight_and_loading_none = (
+        pilot_weight_in is None and wing_loading_in is None
+    ) or set_weight_and_loading
 
     return (
         glider_data.to_dict("records"),
@@ -967,10 +1011,14 @@ def update_graph(
     )
     df_mc_graph = current_polar.MacCready(mc_graph_values)
 
+    mc_graph_values_converted = df_mc_graph["MC"].pint.to(sink_units).pint.magnitude
+    stf_graph_values = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
+
     stf_graph = make_subplots(specs=[[{"secondary_y": True}]])
+
     trace_weight_adjusted = go.Scatter(
-        x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
-        y=df_mc_graph["STF"].pint.to(speed_units).pint.magnitude,
+        x=mc_graph_values_converted,
+        y=stf_graph_values,
         name="Speed-to-Fly",
         mode="lines",
     )
@@ -978,43 +1026,6 @@ def update_graph(
         trace_weight_adjusted,
         secondary_y=False,
     )
-
-    # Add the saved STF results to the graph
-    if df_out is not None:
-        for column in df_out.columns:
-            if column == "MC":
-                continue
-            trace_saved_stf = go.Scatter(
-                x=df_out["MC"],
-                y=df_out[column],
-                name=f"{column}",
-                mode="lines",
-                line=dict(dash="dot"),
-            )
-            stf_graph.add_trace(
-                trace_saved_stf,
-                secondary_y=False,
-            )
-
-    # Collect results when requested
-    if dash.ctx.triggered_id == "save-comparison-button":
-        if df_out is None:
-            df_out = pd.DataFrame(df_mc_graph["MC"].pint.to(sink_units).pint.magnitude)
-            logger.debug("created df_out")
-        column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
-        df_out[column_name] = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
-
-        logger.debug(df_out.columns)
-
-        # Save results externally
-        # Open the file in write mode ('w') with newline=''
-        excel_outfile_name = f"{glider_name} stf.xlsx"
-        df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
-
-        logger.info(f'File "{excel_outfile_name}" created successfully')
-
-        # Disable units change to avoid confusion
-        set_props("radio-units", {"disabled": True})
 
     ###################################################################
     # Plot average speed vs. MC setting
@@ -1033,6 +1044,47 @@ def update_graph(
         secondary_y=False,
     )
 
+    ###################################################################
+    # Add the saved STF results to the graph
+    if df_out is not None:
+        for column in df_out.columns:
+            if column == "MC":
+                continue
+            trace_saved_stf = go.Scatter(
+                x=df_out["MC"],
+                y=df_out[column],  # - stf_graph_values,
+                name=f"{column}",
+                mode="lines",
+                line=dict(dash="dot"),
+            )
+            stf_graph.add_trace(
+                trace_saved_stf,
+                secondary_y=False,
+            )
+
+    ###################################################################
+    # Collect results when requested
+    if dash.ctx.triggered_id == "save-comparison-button":
+        if df_out is None:
+            df_out = pd.DataFrame(df_mc_graph["MC"].pint.to(sink_units).pint.magnitude)
+            logger.debug("created df_out")
+        column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
+        df_out[column_name] = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
+
+        logger.debug(df_out.columns)
+
+        if write_excel_file and not _production_mode and df_out is not None:
+            logger.info("Writing STF results to Excel file")
+            # Save results externally
+            # Sanitize glider name to avoid filesystem errors with invalid characters
+            sanitized_glider_name = sanitize_filename(glider_name)
+            excel_outfile_name = f"{sanitized_glider_name} stf.xlsx"
+            df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
+
+            logger.info(f'File "{excel_outfile_name}" created successfully')
+
+    ###################################################################
+    # Plot debug graphs if requested
     if show_debug_graphs:
         trace_goal_result = go.Scatter(
             x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
