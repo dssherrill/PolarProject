@@ -280,7 +280,7 @@ app.layout = dbc.Container(
                                 {"field": "Metric"},
                                 {"field": "US"},
                             ],
-                            columnSize="autoSize",
+                            columnSize="sizeToFit",
                             dashGridOptions={"domLayout": "autoHeight"},
                             # dashGridOptions={"pagination": False},
                             style={"width": "100%"},
@@ -372,7 +372,6 @@ app.layout = dbc.Container(
                                     value="Metric",
                                     inline=False,
                                     id="radio-units",
-                                    persistence=True,
                                     persistence_type="local",
                                     # disabled=True,
                                 ),
@@ -713,14 +712,14 @@ def process_unit_change(
     min_wing_loading_display = f"{min_wing_loading.to(pressure_units).magnitude:.1f}"
 
     # capture the pilot weight each time it changes
-    set_weight_and_loading = False
     if dash.ctx.triggered_id == "pilot-weight-input":
-        logger.debug("pilot-weight-input")
+        logger.debug(f"{pilot_weight_in=}")
         # Process pilot weight input and compute wing loading to match
         if pilot_weight_in is None:
-            pilot_weight = None  # must remain "None" until set by the user
+            pilot_weight = None
+            working_pilot_weight = current_glider.reference_pilot_weight()
             wing_loading = None
-            set_weight_and_loading = True
+            working_wing_loading = current_glider.reference_wing_loading()
         else:
             working_pilot_weight = (pilot_weight_in * weight_units).to("kg")
             pilot_weight = working_pilot_weight.magnitude
@@ -732,12 +731,13 @@ def process_unit_change(
 
     # capture wing loading input value each time it changes
     if dash.ctx.triggered_id == "wing-loading-input":
-        logger.debug("wing-loading-input")
+        logger.debug(f"{wing_loading_in=}")
         # Process wing loading input and compute pilot weight to match
         if wing_loading_in is None:
+            wing_loading = None
+            working_wing_loading = current_glider.reference_wing_loading()
             pilot_weight = None
-            wing_loading = None  # must remain "None" until set by the user
-            set_weight_and_loading = True
+            working_pilot_weight = current_glider.reference_pilot_weight()
         else:
             working_wing_loading = (wing_loading_in * pressure_units).to("kg/m**2")
             if working_wing_loading < min_wing_loading:
@@ -805,11 +805,6 @@ def process_unit_change(
         }
     )
 
-    # Setting one changes the other, so we need to show both values if either is set
-    weight_and_loading_none = (
-        pilot_weight_in is None and wing_loading_in is None
-    ) or set_weight_and_loading
-
     return (
         glider_data.to_dict("records"),
         f"Horizontal speed ({selected_units['Speed'].units:~P}):",
@@ -819,7 +814,7 @@ def process_unit_change(
         # Pilot weight display value
         (
             None
-            if weight_and_loading_none
+            if pilot_weight is None
             else round(working_pilot_weight.to(weight_units).magnitude, 1)
         ),
         wing_loading_label,
@@ -827,7 +822,7 @@ def process_unit_change(
         # Wing loading display value
         (
             None
-            if weight_and_loading_none
+            if wing_loading is None
             else round(working_wing_loading.to(pressure_units).magnitude, 1)
         ),
         float(min_wing_loading_display),
