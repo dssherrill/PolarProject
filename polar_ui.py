@@ -69,6 +69,9 @@ DEFAULT_GLIDER_NAME = "ASW 28"
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # app = Dash(external_stylesheets=[dbc.themes.SLATE])
 
+# Expose server for deployment platforms (Railway, Heroku, etc.)
+server = app.server
+
 # polynomial fit degree (order)
 DEFAULT_POLYNOMIAL_DEGREE = 5
 
