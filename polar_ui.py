@@ -214,23 +214,67 @@ def add_mc_aggrid():
     )
 
 
-def add_compare_buttons():
+def add_compare_controls():
     """Create comparison control buttons for saving and clearing STF results."""
     return html.Div(
         [
-            dbc.Button(
-                "Save for Comparison",
-                id="save-comparison-button",
-                className="m-2",
-                # color="secondary",
+            dbc.Stack(
+                [
+                    dbc.Button(
+                        "Save for Comparison",
+                        id="save-comparison-button",
+                        className="m-2",
+                        # color="secondary",
+                    ),
+                    dbc.Button(
+                        "Clear Comparison",
+                        id="clear-comparison-button",
+                        className="m-2",
+                        # color="secondary",
+                    ),
+                    dbc.Label(
+                        "Option:",
+                        className="text-primary fs-4",
+                    ),
+                    dbc.RadioItems(
+                        options=["Raw", "Subtracted"],
+                        value="Subtracted",
+                        inline=False,
+                        id="radio-subtract-compare",
+                        persistence_type="local",
+                    ),
+                ],
+                direction="horizontal",
+                className="hstack gap-3 m-3",
             ),
-            dbc.Button(
-                "Clear Comparison",
-                id="clear-comparison-button",
-                className="m-2",
-                # color="secondary",
+        ],
+        className="d-flex align-items-start m-3",
+    )
+
+
+def add_compare_options():
+    """Create comparison control buttons for saving and clearing STF results."""
+    # return html.Div(
+    #     [
+    return (
+        dbc.Col(
+            dbc.Label(
+                "Option:",
+                className="text-primary fs-4",
             ),
-        ]
+            md=3,
+        ),
+        dbc.Col(
+            dbc.RadioItems(
+                options=["Raw", "Subtracted"],
+                value="Subtracted",
+                inline=False,
+                id="radio-subtract-compare",
+                persistence_type="local",
+            ),
+            md=3,
+        ),
+        #        ],
     )
 
 
@@ -286,6 +330,23 @@ app.layout = dbc.Container(
                             style={"width": "100%"},
                             id="glider_AgGrid",
                             # className=full_width_class,
+                        ),
+                        # --- Unit selection
+                        html.Div(
+                            [
+                                dbc.Label(
+                                    "Units:",
+                                    className="text-primary fs-4",
+                                ),
+                                dbc.RadioItems(
+                                    options=["Metric", "US"],
+                                    value="Metric",
+                                    inline=False,
+                                    id="radio-units",
+                                    persistence_type="local",
+                                    # disabled=True,
+                                ),
+                            ],
                         ),
                         # --- Input choices
                         dbc.Label(
@@ -361,22 +422,6 @@ app.layout = dbc.Container(
                             className="mb-3",
                             id="wing-loading-row",
                         ),
-                        html.Div(
-                            [
-                                dbc.Label(
-                                    "Units:",
-                                    className="text-primary fs-4",
-                                ),
-                                dbc.RadioItems(
-                                    options=["Metric", "US"],
-                                    value="Metric",
-                                    inline=False,
-                                    id="radio-units",
-                                    persistence_type="local",
-                                    # disabled=True,
-                                ),
-                            ],
-                        ),
                     ],
                     md=3,
                 ),
@@ -441,11 +486,8 @@ app.layout = dbc.Container(
         # --- Graphs
         html.Br(),
         dbc.Row(
-            [
-                dbc.Col(
-                    [add_compare_buttons()],
-                ),
-            ],
+            [add_compare_controls()],
+            className=full_width_class,
         ),
         html.Br(),
         dbc.Row(
@@ -871,6 +913,7 @@ def process_unit_change(
     Input(component_id="toggle-switch-dump", component_property="value"),
     Input(component_id="save-comparison-button", component_property="n_clicks"),
     Input(component_id="clear-comparison-button", component_property="n_clicks"),
+    Input(component_id="radio-subtract-compare", component_property="value"),
     State(component_id="radio-units", component_property="value"),
     State(component_id="radio-weight-or-loading", component_property="value"),
     State("df-out-store", "data"),
@@ -885,6 +928,7 @@ def update_graph(
     write_excel_file,
     save_comparison,
     clear_comparison,
+    subtract_compare,
     units,
     weight_or_loading,
     df_out_data,
@@ -901,6 +945,9 @@ def update_graph(
         goal_function (str): Identifier of the solver goal function passed to the polar model.
         show_debug_graphs (bool): If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
         write_excel_file (bool): If true, append STF results for the current degree to an Excel file named "<glider> stf.xlsx".
+        save_comparison (bool): If true, save current STF results for later comparison.
+        clear_comparison (bool): If true, clear previously saved comparison data.
+        subtract_compare (str): Display mode for saved comparison data on graphs. When set to "Subtracted", the saved data is subtracted from current values to show differences; otherwise, saved data is displayed directly.
         units (str): Unit system key, either 'Metric' or 'US', used to select display units for speed, sink, and weight.
         weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
         df_out_data (dict): Stored df_out data from localStorage for displaying saved STF results on graph.
@@ -965,7 +1012,7 @@ def update_graph(
         f"update_graph, from working-data-store: pilot_weight: {pilot_weight}, wing_loading: {wing_loading}, v_air_horiz: {v_air_horiz}, v_air_vert: {v_air_vert}"
     )
     logger.info(
-        f"update_graph input parameters: {degree=}, {glider_name=}, {maccready=}, {goal_function=}, {show_debug_graphs=}, {write_excel_file=}\n{save_comparison=}, {clear_comparison=}, {units=}, {weight_or_loading=} "
+        f"update_graph input parameters: {degree=}, {glider_name=}, {maccready=}, {goal_function=}, {show_debug_graphs=}, {write_excel_file=}\n{save_comparison=}, {clear_comparison=}, {subtract_compare=}, {units=}, {weight_or_loading=} "
     )
 
     # Setup units
@@ -1019,6 +1066,7 @@ def update_graph(
         y=stf_graph_values,
         name="Speed-to-Fly",
         mode="lines",
+        visible="legendonly" if subtract_compare == "Subtracted" else True,
     )
     stf_graph.add_trace(
         trace_weight_adjusted,
@@ -1036,6 +1084,7 @@ def update_graph(
         y=y,
         name="Average Speed",
         mode="lines",
+        visible="legendonly" if subtract_compare == "Subtracted" else True,
     )
     stf_graph.add_trace(
         trace_stf,
@@ -1050,7 +1099,11 @@ def update_graph(
                 continue
             trace_saved_stf = go.Scatter(
                 x=df_out["MC"],
-                y=df_out[column],  # - stf_graph_values,
+                y=(
+                    df_out[column] - stf_graph_values
+                    if subtract_compare == "Subtracted"
+                    else df_out[column]
+                ),
                 name=f"{column}",
                 mode="lines",
                 line=dict(dash="dot"),
