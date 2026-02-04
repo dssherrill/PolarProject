@@ -26,6 +26,8 @@ pip install -r requirements.txt
 
 The `requirements.txt` file is included for deployment platforms that rely on it. Railway and similar platforms will automatically detect and use it.
 
+**For detailed Railway deployment instructions, see [RAILWAY.md](RAILWAY.md)**
+
 ## Running the Application
 
 ```bash
