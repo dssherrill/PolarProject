@@ -217,12 +217,12 @@ def add_mc_aggrid():
 def add_compare_controls():
     """
     Create a Dash HTML container with controls to save and clear Speed-to-Fly (STF) results and to choose the comparison display mode.
-    
+
     The container includes:
     - a "Save for Comparison" button,
     - a "Clear Comparison" button,
     - a radio control with options "Raw" and "Subtracted" (default "Subtracted") to select how saved comparisons are displayed.
-    
+
     Returns:
         html.Div: A Dash HTML container with the comparison buttons and radio items.
     """
@@ -241,6 +241,7 @@ def add_compare_controls():
                         id="clear-comparison-button",
                         className="m-2",
                         # color="secondary",
+                        disabled=True,
                     ),
                     dbc.Label(
                         "Display:",
@@ -281,7 +282,7 @@ def add_compare_controls():
 def add_compare_options():
     """
     Render the comparison option controls for STF plotting mode selection.
-    
+
     Returns:
         tuple: Two Bootstrap column components:
             - A `dbc.Col` containing a label for the option selector.
@@ -939,6 +940,7 @@ def process_unit_change(
     Output(component_id="mcAgGrid", component_property="columnDefs"),
     Output(component_id="mcAgGrid", component_property="columnSize"),
     Output(component_id="poly-degree", component_property="value"),
+    Output(component_id="clear-comparison-button", component_property="disabled"),
     Output("df-out-store", "data"),
     Input("working-data-store", "data"),
     Input(component_id="poly-degree", component_property="value"),
@@ -973,7 +975,7 @@ def update_graph(
 ):
     """
     Compute and return the polar plot, Speed-to-Fly plot, MacCready table data, and other UI outputs based on the current glider, inputs, and stored state.
-    
+
     Parameters:
         data (dict): Working-state values from storage; expected keys include 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert' with SI magnitudes (m, m/s, kg, etc.) as appropriate.
         degree (int|None): Desired polynomial degree for the polar fit; a value less than 2 or None will be treated as 2.
@@ -988,7 +990,7 @@ def update_graph(
         units (str): Unit system key, e.g. 'Metric' or 'US', used to choose display units for speed, sink, weight, and pressure.
         weight_or_loading (str): Mode string selecting whether legends/labels reference 'Pilot Weight' or 'Wing Loading'.
         df_out_data (dict|None): Serialized saved STF data from localStorage (or None) used to overlay or subtract previously saved series.
-    
+
     Returns:
         tuple: (glider_name, polar_messages, polar_figure, stf_figure, mc_table_records, mc_table_column_defs, column_size_mode, degree_used, df_out_data_return)
             - glider_name (str): Displayed glider name used for outputs.
@@ -1012,7 +1014,9 @@ def update_graph(
             df_out.columns = pd.MultiIndex.from_tuples(df_out_data["columns"])
             # Reattach units to all data columns
             for col in df_out.columns:
-                if col[0] != "MC":  # Don't reattach units to MC column (already has them)
+                if (
+                    col[0] != "MC"
+                ):  # Don't reattach units to MC column (already has them)
                     df_out[col] = PA_(df_out[col], ureg.mps)
         else:
             # Legacy format: flat column structure
@@ -1153,17 +1157,27 @@ def update_graph(
                 # Get MC values for this configuration
                 mc_plot = df_out[(config_name, "MC")].pint.to(sink_units).pint.magnitude
                 # Get the selected metric (STF or Vavg) for comparison
-                metric_compare = df_out[(config_name, compare_metric)].pint.to(speed_units).pint.magnitude
-                
+                metric_compare = (
+                    df_out[(config_name, compare_metric)]
+                    .pint.to(speed_units)
+                    .pint.magnitude
+                )
+
                 # Compute the reference values to subtract (if in subtracted mode)
                 if compare_metric == "STF":
                     reference_values = stf_graph_values
                 else:  # Vavg
-                    reference_values = df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
-                
+                    reference_values = (
+                        df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
+                    )
+
                 trace_saved = go.Scatter(
                     x=mc_plot,
-                    y=(metric_compare - reference_values if subtract_active else metric_compare),
+                    y=(
+                        metric_compare - reference_values
+                        if subtract_active
+                        else metric_compare
+                    ),
                     name=f"{config_name}",
                     mode="lines",
                     line=dict(dash="dot"),
@@ -1181,7 +1195,11 @@ def update_graph(
                 stf_compare = df_out[column].pint.to(speed_units).pint.magnitude
                 trace_saved_stf = go.Scatter(
                     x=mc_plot,
-                    y=(stf_compare - stf_graph_values if subtract_active else stf_compare),
+                    y=(
+                        stf_compare - stf_graph_values
+                        if subtract_active
+                        else stf_compare
+                    ),
                     name=f"{column}",
                     mode="lines",
                     line=dict(dash="dot"),
@@ -1195,16 +1213,18 @@ def update_graph(
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
-        
+
         if df_out is None:
             # Create new DataFrame with MultiIndex columns
             # First level: column name (e.g., "ASW 28 100.0 kg")
             # Second level: metric type ("MC", "STF", "Vavg")
-            df_out = pd.DataFrame({
-                (column_name, "MC"): df_mc_graph["MC"],
-                (column_name, "STF"): df_mc_graph["STF"],
-                (column_name, "Vavg"): df_mc_graph["Vavg"],
-            })
+            df_out = pd.DataFrame(
+                {
+                    (column_name, "MC"): df_mc_graph["MC"],
+                    (column_name, "STF"): df_mc_graph["STF"],
+                    (column_name, "Vavg"): df_mc_graph["Vavg"],
+                }
+            )
             logger.debug("created df_out with MultiIndex")
         else:
             # Add new columns to existing DataFrame
@@ -1425,7 +1445,7 @@ def update_graph(
                         else df_out[col].tolist()
                     )
                     for col in df_out.columns
-                }
+                },
             }
         else:
             # Legacy flat format
@@ -1450,6 +1470,9 @@ def update_graph(
         new_column_defs,
         "sizeToFit",
         degree,
+        (
+            df_out_data_return is None
+        ),  # disable the "Clear Comparison" button if there is no data saved
         df_out_data_return,
     )
 
