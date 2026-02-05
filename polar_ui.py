@@ -243,7 +243,7 @@ def add_compare_controls():
                         # color="secondary",
                     ),
                     dbc.Label(
-                        "Option:",
+                        "Display:",
                         className="text-primary fs-4",
                     ),
                     dbc.RadioItems(
@@ -251,6 +251,21 @@ def add_compare_controls():
                         value="Subtracted",
                         inline=False,
                         id="radio-subtract-compare",
+                        persistence=True,
+                        persistence_type="local",
+                    ),
+                    dbc.Label(
+                        "Compare:",
+                        className="text-primary fs-4",
+                    ),
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Speed-to-Fly", "value": "STF"},
+                            {"label": "Average Speed", "value": "Vavg"},
+                        ],
+                        value="STF",
+                        inline=False,
+                        id="radio-compare-metric",
                         persistence=True,
                         persistence_type="local",
                     ),
@@ -935,6 +950,7 @@ def process_unit_change(
     Input(component_id="save-comparison-button", component_property="n_clicks"),
     Input(component_id="clear-comparison-button", component_property="n_clicks"),
     Input(component_id="radio-subtract-compare", component_property="value"),
+    Input(component_id="radio-compare-metric", component_property="value"),
     State(component_id="radio-units", component_property="value"),
     State(component_id="radio-weight-or-loading", component_property="value"),
     State("df-out-store", "data"),
@@ -950,6 +966,7 @@ def update_graph(
     save_comparison,
     clear_comparison,
     subtract_compare,
+    compare_metric,
     units,
     weight_or_loading,
     df_out_data,
@@ -985,12 +1002,24 @@ def update_graph(
             - df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
     """
     # Load df_out from store or initialize to None
-    # Rehydrate PintArray columns (MC and all STF columns are in m/s)
+    # Rehydrate PintArray columns with units
     if df_out_data:
-        df_out = pd.DataFrame(df_out_data)
-        # Reattach units: all columns (MC and STF data) are in m/s
-        for col in df_out.columns:
-            df_out[col] = PA_(df_out[col], ureg.mps)
+        # Check if data has MultiIndex structure
+        if "columns" in df_out_data and "data" in df_out_data:
+            # MultiIndex format: columns is list of tuples, data is dict of lists
+            df_out = pd.DataFrame(df_out_data["data"])
+            # Reconstruct MultiIndex columns
+            df_out.columns = pd.MultiIndex.from_tuples(df_out_data["columns"])
+            # Reattach units to all data columns
+            for col in df_out.columns:
+                if col[0] != "MC":  # Don't reattach units to MC column (already has them)
+                    df_out[col] = PA_(df_out[col], ureg.mps)
+        else:
+            # Legacy format: flat column structure
+            df_out = pd.DataFrame(df_out_data)
+            # Reattach units: all columns (MC and STF data) are in m/s
+            for col in df_out.columns:
+                df_out[col] = PA_(df_out[col], ureg.mps)
     else:
         df_out = None
 
@@ -1114,33 +1143,74 @@ def update_graph(
     )
 
     ###################################################################
-    # Add the saved STF results to the graph
+    # Add the saved results to the graph
     if df_out is not None:
-        mc_plot = df_out["MC"].pint.to(sink_units).pint.magnitude
-        for column in df_out.columns:
-            if column == "MC":
-                continue
-            stf_compare = df_out[column].pint.to(speed_units).pint.magnitude
-            trace_saved_stf = go.Scatter(
-                x=mc_plot,
-                y=(stf_compare - stf_graph_values if subtract_active else stf_compare),
-                name=f"{column}",
-                mode="lines",
-                line=dict(dash="dot"),
-            )
-            stf_graph.add_trace(
-                trace_saved_stf,
-                secondary_y=False,
-            )
+        # Get unique column names (first level of MultiIndex)
+        if isinstance(df_out.columns, pd.MultiIndex):
+            # MultiIndex format
+            config_names = df_out.columns.get_level_values(0).unique()
+            for config_name in config_names:
+                # Get MC values for this configuration
+                mc_plot = df_out[(config_name, "MC")].pint.to(sink_units).pint.magnitude
+                # Get the selected metric (STF or Vavg) for comparison
+                metric_compare = df_out[(config_name, compare_metric)].pint.to(speed_units).pint.magnitude
+                
+                # Compute the reference values to subtract (if in subtracted mode)
+                if compare_metric == "STF":
+                    reference_values = stf_graph_values
+                else:  # Vavg
+                    reference_values = df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
+                
+                trace_saved = go.Scatter(
+                    x=mc_plot,
+                    y=(metric_compare - reference_values if subtract_active else metric_compare),
+                    name=f"{config_name}",
+                    mode="lines",
+                    line=dict(dash="dot"),
+                )
+                stf_graph.add_trace(
+                    trace_saved,
+                    secondary_y=False,
+                )
+        else:
+            # Legacy format: flat columns (for backward compatibility)
+            mc_plot = df_out["MC"].pint.to(sink_units).pint.magnitude
+            for column in df_out.columns:
+                if column == "MC":
+                    continue
+                stf_compare = df_out[column].pint.to(speed_units).pint.magnitude
+                trace_saved_stf = go.Scatter(
+                    x=mc_plot,
+                    y=(stf_compare - stf_graph_values if subtract_active else stf_compare),
+                    name=f"{column}",
+                    mode="lines",
+                    line=dict(dash="dot"),
+                )
+                stf_graph.add_trace(
+                    trace_saved_stf,
+                    secondary_y=False,
+                )
 
     ###################################################################
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
-        if df_out is None:
-            df_out = pd.DataFrame({"MC": df_mc_graph["MC"]})
-            logger.debug("created df_out")
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
-        df_out[column_name] = df_mc_graph["STF"]
+        
+        if df_out is None:
+            # Create new DataFrame with MultiIndex columns
+            # First level: column name (e.g., "ASW 28 100.0 kg")
+            # Second level: metric type ("MC", "STF", "Vavg")
+            df_out = pd.DataFrame({
+                (column_name, "MC"): df_mc_graph["MC"],
+                (column_name, "STF"): df_mc_graph["STF"],
+                (column_name, "Vavg"): df_mc_graph["Vavg"],
+            })
+            logger.debug("created df_out with MultiIndex")
+        else:
+            # Add new columns to existing DataFrame
+            df_out[(column_name, "MC")] = df_mc_graph["MC"]
+            df_out[(column_name, "STF")] = df_mc_graph["STF"]
+            df_out[(column_name, "Vavg")] = df_mc_graph["Vavg"]
 
         logger.debug(df_out.columns)
 
@@ -1344,14 +1414,29 @@ def update_graph(
     # Convert df_out to dict for storage, or None if df_out is None
     # Strip pint units (keep only magnitudes) for localStorage serialization
     if df_out is not None:
-        df_out_data_return = {
-            col: (
-                df_out[col].pint.magnitude.tolist()
-                if hasattr(df_out[col], "pint")
-                else df_out[col].tolist()
-            )
-            for col in df_out.columns
-        }
+        if isinstance(df_out.columns, pd.MultiIndex):
+            # Serialize MultiIndex structure
+            df_out_data_return = {
+                "columns": [tuple(col) for col in df_out.columns.tolist()],
+                "data": {
+                    str(col): (
+                        df_out[col].pint.magnitude.tolist()
+                        if hasattr(df_out[col], "pint")
+                        else df_out[col].tolist()
+                    )
+                    for col in df_out.columns
+                }
+            }
+        else:
+            # Legacy flat format
+            df_out_data_return = {
+                col: (
+                    df_out[col].pint.magnitude.tolist()
+                    if hasattr(df_out[col], "pint")
+                    else df_out[col].tolist()
+                )
+                for col in df_out.columns
+            }
     else:
         df_out_data_return = None
 
