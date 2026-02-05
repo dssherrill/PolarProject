@@ -1,9 +1,8 @@
 # units.py
-from pint import UnitRegistry
+from pint import UnitRegistry, set_application_registry
 
 # There can only be a single UnitRegistry instance
 ureg = UnitRegistry()
 
-# Optional: set as the application registry for pickling support
-# from pint import set_application_registry
-# set_application_registry(ureg)
+# Set as the application registry for pickling support
+set_application_registry(ureg)
