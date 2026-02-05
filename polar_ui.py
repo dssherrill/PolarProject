@@ -988,12 +988,9 @@ def update_graph(
     # Rehydrate PintArray columns (MC and all STF columns are in m/s)
     if df_out_data:
         df_out = pd.DataFrame(df_out_data)
-        # Reattach units: MC column is m/s, all other columns (STF data) are also m/s
-        if "MC" in df_out.columns:
-            df_out["MC"] = PA_(df_out["MC"], ureg.mps)
+        # Reattach units: all columns (MC and STF data) are in m/s
         for col in df_out.columns:
-            if col != "MC":  # All other columns are STF values in m/s
-                df_out[col] = PA_(df_out[col], ureg.mps)
+            df_out[col] = PA_(df_out[col], ureg.mps)
     else:
         df_out = None
 
