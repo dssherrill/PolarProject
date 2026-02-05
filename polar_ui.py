@@ -985,7 +985,14 @@ def update_graph(
             - df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
     """
     # Load df_out from store or initialize to None
-    df_out = pd.DataFrame(df_out_data) if df_out_data else None
+    # Rehydrate PintArray columns (MC and all STF columns are in m/s)
+    if df_out_data:
+        df_out = pd.DataFrame(df_out_data)
+        # Reattach units: all columns (MC and STF data) are in m/s
+        for col in df_out.columns:
+            df_out[col] = PA_(df_out[col], ureg.mps)
+    else:
+        df_out = None
 
     logger.debug(f"{dash.ctx.triggered_id=}")
     # reset accumulated data on request
@@ -1109,13 +1116,11 @@ def update_graph(
     ###################################################################
     # Add the saved STF results to the graph
     if df_out is not None:
-        mc_plot = (df_out["MC"].to_numpy() * ureg("m/s")).to(sink_units).magnitude
+        mc_plot = df_out["MC"].pint.to(sink_units).pint.magnitude
         for column in df_out.columns:
             if column == "MC":
                 continue
-            stf_compare = (
-                (df_out[column].to_numpy() * ureg("m/s")).to(speed_units).magnitude
-            )
+            stf_compare = df_out[column].pint.to(speed_units).pint.magnitude
             trace_saved_stf = go.Scatter(
                 x=mc_plot,
                 y=(stf_compare - stf_graph_values if subtract_active else stf_compare),
@@ -1132,10 +1137,10 @@ def update_graph(
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
         if df_out is None:
-            df_out = pd.DataFrame(df_mc_graph["MC"].pint.magnitude)
+            df_out = pd.DataFrame({"MC": df_mc_graph["MC"]})
             logger.debug("created df_out")
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
-        df_out[column_name] = df_mc_graph["STF"].pint.magnitude
+        df_out[column_name] = df_mc_graph["STF"]
 
         logger.debug(df_out.columns)
 
@@ -1337,7 +1342,18 @@ def update_graph(
     polar_graph.update_yaxes(tickformat=".1f", secondary_y=False)
 
     # Convert df_out to dict for storage, or None if df_out is None
-    df_out_data_return = df_out.to_dict("list") if df_out is not None else None
+    # Strip pint units (keep only magnitudes) for localStorage serialization
+    if df_out is not None:
+        df_out_data_return = {
+            col: (
+                df_out[col].pint.magnitude.tolist()
+                if hasattr(df_out[col], "pint")
+                else df_out[col].tolist()
+            )
+            for col in df_out.columns
+        }
+    else:
+        df_out_data_return = None
 
     logger.debug("update_graph return\n")
     return (
