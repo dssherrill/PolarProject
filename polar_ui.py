@@ -241,6 +241,7 @@ def add_compare_controls():
                         value="Subtracted",
                         inline=False,
                         id="radio-subtract-compare",
+                        persistence=True,
                         persistence_type="local",
                     ),
                 ],
@@ -270,6 +271,7 @@ def add_compare_options():
                 value="Subtracted",
                 inline=False,
                 id="radio-subtract-compare",
+                persistence=True,
                 persistence_type="local",
             ),
             md=3,
@@ -343,8 +345,8 @@ app.layout = dbc.Container(
                                     value="Metric",
                                     inline=False,
                                     id="radio-units",
+                                    persistence=True,
                                     persistence_type="local",
-                                    # disabled=True,
                                 ),
                             ],
                         ),
@@ -392,6 +394,7 @@ app.layout = dbc.Container(
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
                                     debounce=0.75,
+                                    persistence=True,
                                     persistence_type="local",
                                 ),
                             ],
@@ -416,6 +419,7 @@ app.layout = dbc.Container(
                                     placeholder="100",
                                     style={"margin-end": 100, "width": 450},
                                     debounce=0.75,
+                                    persistence=True,
                                     persistence_type="local",
                                 ),
                             ],
@@ -967,22 +971,15 @@ def update_graph(
     # Load df_out from store or initialize to None
     df_out = pd.DataFrame(df_out_data) if df_out_data else None
 
-    def disable_units_change(disable: bool):
-        """Disable the units radio buttons to prevent changes after saving comparison data."""
-        set_props("radio-units", {"disabled": disable})
-
     logger.debug(f"{dash.ctx.triggered_id=}")
     # reset accumulated data on request
     if dash.ctx.triggered_id == "clear-comparison-button":
         logger.debug("Clearing comparison data and re-enabling units change")
         df_out = None
-        # Re-enable units change
-        disable_units_change(False)
 
     # Disable units change to avoid confusion
     if dash.ctx.triggered_id == "save-comparison-button":
         logger.debug("Disabling units change after saving comparison")
-        disable_units_change(True)
 
     logger.info(f"data from store: {data}")
 
@@ -1048,6 +1045,8 @@ def update_graph(
         else (f"{(wing_loading * ureg('kg/m**2')).to(pressure_units):.1f~P}")
     )
 
+    subtract_active = subtract_compare == "Subtracted" and df_out is not None
+
     ##################################################################
     # Graph Speed-to-Fly vs. MC setting
     # MacCready values for table, zero to 10 knots, but must be converted to m/s
@@ -1066,7 +1065,7 @@ def update_graph(
         y=stf_graph_values,
         name="Speed-to-Fly",
         mode="lines",
-        visible="legendonly" if subtract_compare == "Subtracted" else True,
+        visible="legendonly" if subtract_active else True,
     )
     stf_graph.add_trace(
         trace_weight_adjusted,
@@ -1084,7 +1083,7 @@ def update_graph(
         y=y,
         name="Average Speed",
         mode="lines",
-        visible="legendonly" if subtract_compare == "Subtracted" else True,
+        visible="legendonly" if subtract_active else True,
     )
     stf_graph.add_trace(
         trace_stf,
@@ -1094,16 +1093,16 @@ def update_graph(
     ###################################################################
     # Add the saved STF results to the graph
     if df_out is not None:
+        mc_plot = (df_out["MC"].to_numpy() * ureg("m/s")).to(sink_units).magnitude
         for column in df_out.columns:
             if column == "MC":
                 continue
+            stf_compare = (
+                (df_out[column].to_numpy() * ureg("m/s")).to(speed_units).magnitude
+            )
             trace_saved_stf = go.Scatter(
-                x=df_out["MC"],
-                y=(
-                    df_out[column] - stf_graph_values
-                    if subtract_compare == "Subtracted"
-                    else df_out[column]
-                ),
+                x=mc_plot,
+                y=(stf_compare - stf_graph_values if subtract_active else stf_compare),
                 name=f"{column}",
                 mode="lines",
                 line=dict(dash="dot"),
@@ -1117,10 +1116,10 @@ def update_graph(
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
         if df_out is None:
-            df_out = pd.DataFrame(df_mc_graph["MC"].pint.to(sink_units).pint.magnitude)
+            df_out = pd.DataFrame(df_mc_graph["MC"].pint.magnitude)
             logger.debug("created df_out")
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
-        df_out[column_name] = df_mc_graph["STF"].pint.to(speed_units).pint.magnitude
+        df_out[column_name] = df_mc_graph["STF"].pint.magnitude
 
         logger.debug(df_out.columns)
 
