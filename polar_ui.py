@@ -1013,25 +1013,17 @@ def update_graph(
     # Load df_out from store or initialize to None
     # Rehydrate PintArray columns with units
     if df_out_data:
-        # Check if data has MultiIndex structure
-        if "columns" in df_out_data and "data" in df_out_data:
-            # MultiIndex format: Use positional mapping to preserve column order
-            # Map each tuple-column from df_out_data["columns"] to its data list
-            column_tuples = [tuple(col) for col in df_out_data["columns"]]
-            data_lists = [df_out_data["data"][str(col)] for col in column_tuples]
-            # Build DataFrame using explicit tuple-to-data pairing via zip
-            data_dict = dict(zip(column_tuples, data_lists))
-            df_out = pd.DataFrame(data_dict)
-            # Columns are already MultiIndex from dict keys (tuples)
-            # Reattach units to all data columns including MC
-            for col in df_out.columns:
-                df_out[col] = PA_(df_out[col], ureg.mps)
-        else:
-            # Legacy format: flat column structure
-            df_out = pd.DataFrame(df_out_data)
-            # Reattach units: all columns (MC and STF data) are in m/s
-            for col in df_out.columns:
-                df_out[col] = PA_(df_out[col], ureg.mps)
+        # MultiIndex format: Use positional mapping to preserve column order
+        # Map each tuple-column from df_out_data["columns"] to its data list
+        column_tuples = [tuple(col) for col in df_out_data["columns"]]
+        data_lists = [df_out_data["data"][str(col)] for col in column_tuples]
+        # Build DataFrame using explicit tuple-to-data pairing via zip
+        data_dict = dict(zip(column_tuples, data_lists))
+        df_out = pd.DataFrame(data_dict)
+        # Columns are already MultiIndex from dict keys (tuples)
+        # Reattach units to all data columns including MC
+        for col in df_out.columns:
+            df_out[col] = PA_(df_out[col], ureg.mps)
     else:
         df_out = None
 
@@ -1158,64 +1150,40 @@ def update_graph(
     # Add the saved results to the graph
     if df_out is not None:
         # Get unique column names (first level of MultiIndex)
-        if isinstance(df_out.columns, pd.MultiIndex):
-            # MultiIndex format
-            config_names = df_out.columns.get_level_values(0).unique()
-            for config_name in config_names:
-                # Get MC values for this configuration
-                mc_plot = df_out[(config_name, "MC")].pint.to(sink_units).pint.magnitude
-                # Get the selected metric (STF or Vavg) for comparison
-                metric_compare = (
-                    df_out[(config_name, compare_metric)]
-                    .pint.to(speed_units)
-                    .pint.magnitude
+        config_names = df_out.columns.get_level_values(0).unique()
+        for config_name in config_names:
+            # Get MC values for this configuration
+            mc_plot = df_out[(config_name, "MC")].pint.to(sink_units).pint.magnitude
+            # Get the selected metric (STF or Vavg) for comparison
+            metric_compare = (
+                df_out[(config_name, compare_metric)]
+                .pint.to(speed_units)
+                .pint.magnitude
+            )
+
+            # Compute the reference values to subtract (if in subtracted mode)
+            if compare_metric == "STF":
+                reference_values = stf_graph_values
+            else:  # Vavg
+                reference_values = (
+                    df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
                 )
 
-                # Compute the reference values to subtract (if in subtracted mode)
-                if compare_metric == "STF":
-                    reference_values = stf_graph_values
-                else:  # Vavg
-                    reference_values = (
-                        df_mc_graph["Vavg"].pint.to(speed_units).pint.magnitude
-                    )
-
-                trace_saved = go.Scatter(
-                    x=mc_plot,
-                    y=(
-                        metric_compare - reference_values
-                        if subtract_active
-                        else metric_compare
-                    ),
-                    name=f"{config_name}",
-                    mode="lines",
-                    line=dict(dash="dot"),
-                )
-                stf_graph.add_trace(
-                    trace_saved,
-                    secondary_y=False,
-                )
-        else:
-            # Legacy format: flat columns (for backward compatibility)
-            mc_plot = df_out["MC"].pint.to(sink_units).pint.magnitude
-            for column in df_out.columns:
-                if column == "MC":
-                    continue
-                stf_compare = df_out[column].pint.to(speed_units).pint.magnitude
-                trace_saved_stf = go.Scatter(
-                    x=mc_plot,
-                    y=(
-                        stf_compare - stf_graph_values
-                        if subtract_active
-                        else stf_compare
-                    ),
-                    name=f"{column}",
-                    mode="lines",
-                    line=dict(dash="dot"),
-                )
-                stf_graph.add_trace(
-                    trace_saved_stf,
-                    secondary_y=False,
-                )
+            trace_saved = go.Scatter(
+                x=mc_plot,
+                y=(
+                    metric_compare - reference_values
+                    if subtract_active
+                    else metric_compare
+                ),
+                name=f"{config_name}",
+                mode="lines",
+                line=dict(dash="dot"),
+            )
+            stf_graph.add_trace(
+                trace_saved,
+                secondary_y=False,
+            )
 
     ###################################################################
     # Collect results when requested
@@ -1223,7 +1191,7 @@ def update_graph(
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
 
         # Check if this configuration already exists
-        if df_out is not None and isinstance(df_out.columns, pd.MultiIndex):
+        if df_out is not None:
             existing_configs = df_out.columns.get_level_values(0).unique()
             if column_name in existing_configs:
                 logger.warning(
@@ -1454,29 +1422,17 @@ def update_graph(
         # while df_out_data_return["data"] uses str(col) keys for JSON-safe storage; rehydration later
         # relies on the preserved order of df_out.columns and the corresponding data values to restore
         # the original MultiIndex from these tuples.
-        if isinstance(df_out.columns, pd.MultiIndex):
-            # Serialize MultiIndex structure
-            df_out_data_return = {
-                "columns": [tuple(col) for col in df_out.columns.tolist()],
-                "data": {
-                    str(col): (
-                        df_out[col].pint.magnitude.tolist()
-                        if hasattr(df_out[col], "pint")
-                        else df_out[col].tolist()
-                    )
-                    for col in df_out.columns
-                },
-            }
-        else:
-            # Legacy flat format
-            df_out_data_return = {
-                col: (
+        df_out_data_return = {
+            "columns": [tuple(col) for col in df_out.columns.tolist()],
+            "data": {
+                str(col): (
                     df_out[col].pint.magnitude.tolist()
                     if hasattr(df_out[col], "pint")
                     else df_out[col].tolist()
                 )
                 for col in df_out.columns
-            }
+            },
+        }
     else:
         df_out_data_return = None
 
