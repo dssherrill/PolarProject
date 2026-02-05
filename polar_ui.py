@@ -1,4 +1,4 @@
-﻿import math
+import math
 import os
 import re
 
@@ -215,7 +215,17 @@ def add_mc_aggrid():
 
 
 def add_compare_controls():
-    """Create comparison control buttons for saving and clearing STF results."""
+    """
+    Create a Dash HTML container with controls to save and clear Speed-to-Fly (STF) results and to choose the comparison display mode.
+    
+    The container includes:
+    - a "Save for Comparison" button,
+    - a "Clear Comparison" button,
+    - a radio control with options "Raw" and "Subtracted" (default "Subtracted") to select how saved comparisons are displayed.
+    
+    Returns:
+        html.Div: A Dash HTML container with the comparison buttons and radio items.
+    """
     return html.Div(
         [
             dbc.Stack(
@@ -254,7 +264,14 @@ def add_compare_controls():
 
 
 def add_compare_options():
-    """Create comparison control buttons for saving and clearing STF results."""
+    """
+    Render the comparison option controls for STF plotting mode selection.
+    
+    Returns:
+        tuple: Two Bootstrap column components:
+            - A `dbc.Col` containing a label for the option selector.
+            - A `dbc.Col` containing a `dbc.RadioItems` with choices "Raw" and "Subtracted" (default "Subtracted") and local persistence.
+    """
     # return html.Div(
     #     [
     return (
@@ -938,35 +955,34 @@ def update_graph(
     df_out_data,
 ):
     """
-    Update the polar and Speed-to-Fly graphs, compute MacCready table rows in the selected units,
-    and produce all Dash callback outputs for the UI.
-
+    Compute and return the polar plot, Speed-to-Fly plot, MacCready table data, and other UI outputs based on the current glider, inputs, and stored state.
+    
     Parameters:
-        data (dict): Stored user values; may contain 'pilot_weight' (kg), 'v_air_horiz' (m/s), and 'v_air_vert' (m/s).
-        degree (int|None): Polynomial degree to fit the polar; treated as at least 2 if lower or None.
-        glider_name (str|None): Selected glider name; defaults to the application default when falsy.
-        maccready (float|None): MacCready setting expressed in the currently selected sink units; treated as 0.0 if None.
-        goal_function (str): Identifier of the solver goal function passed to the polar model.
-        show_debug_graphs (bool): If true, include diagnostic traces (residuals, goal function, solver result) on the graphs.
-        write_excel_file (bool): If true, append STF results for the current degree to an Excel file named "<glider> stf.xlsx".
-        save_comparison (bool): If true, save current STF results for later comparison.
-        clear_comparison (bool): If true, clear previously saved comparison data.
-        subtract_compare (str): Display mode for saved comparison data on graphs. When set to "Subtracted", the saved data is subtracted from current values to show differences; otherwise, saved data is displayed directly.
-        units (str): Unit system key, either 'Metric' or 'US', used to select display units for speed, sink, and weight.
-        weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
-        df_out_data (dict): Stored df_out data from localStorage for displaying saved STF results on graph.
-
+        data (dict): Working-state values from storage; expected keys include 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert' with SI magnitudes (m, m/s, kg, etc.) as appropriate.
+        degree (int|None): Desired polynomial degree for the polar fit; a value less than 2 or None will be treated as 2.
+        glider_name (str|None): Name of the selected glider; when falsy the application default glider is used.
+        maccready (float|None): MacCready setting expressed in the currently selected sink units; None is treated as 0.0.
+        goal_function (str): Identifier for the solver goal function used by the polar model.
+        show_debug_graphs (bool): If True, include diagnostic traces (goal function, residuals, solver result) on the graphs.
+        write_excel_file (bool): If True and the app is not in production mode, append saved STF results to an Excel file named "<sanitized glider name> stf.xlsx".
+        save_comparison (bool): Trigger indicating the current STF should be saved into the comparison store.
+        clear_comparison (bool): Trigger indicating previously saved comparison data should be cleared.
+        subtract_compare (str): Comparison display mode; when equal to "Subtracted" and saved data exists, saved STF series are subtracted from the current STF for plotting.
+        units (str): Unit system key, e.g. 'Metric' or 'US', used to choose display units for speed, sink, weight, and pressure.
+        weight_or_loading (str): Mode string selecting whether legends/labels reference 'Pilot Weight' or 'Wing Loading'.
+        df_out_data (dict|None): Serialized saved STF data from localStorage (or None) used to overlay or subtract previously saved series.
+    
     Returns:
-        tuple: Nine items matching the Dash outputs in order:
-            - displayed glider name (str)
-            - status and informational messages from the polar model (str)
-            - polar plot figure (plotly.graph_objs.Figure)
-            - Speed-to-Fly plot figure (plotly.graph_objs.Figure)
-            - MacCready table rows as a list of dicts (records)
-            - AG Grid column definitions for the MacCready table (list[dict])
-            - AG Grid column sizing mode (str), e.g. "sizeToFit"
-            - effective polynomial degree actually used (int)
-            - updated df_out data (dict) for localStorage
+        tuple: (glider_name, polar_messages, polar_figure, stf_figure, mc_table_records, mc_table_column_defs, column_size_mode, degree_used, df_out_data_return)
+            - glider_name (str): Displayed glider name used for outputs.
+            - polar_messages (str): Informational or status messages produced by the polar model.
+            - polar_figure (plotly.graph_objs.Figure): Figure containing the polar data and fit (and optional debug traces).
+            - stf_figure (plotly.graph_objs.Figure): Figure containing Speed‑to‑Fly vs MacCready (and optional saved comparison traces).
+            - mc_table_records (list[dict]): MacCready table rows suitable for AG Grid (fields: MC, STF, Vavg, L/D) with values converted to display units.
+            - mc_table_column_defs (list[dict]): AG Grid column definition objects for the MacCready table.
+            - column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit").
+            - degree_used (int): Effective polynomial degree applied (always >= 2).
+            - df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
     """
     # Load df_out from store or initialize to None
     df_out = pd.DataFrame(df_out_data) if df_out_data else None
