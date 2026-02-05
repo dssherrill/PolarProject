@@ -326,7 +326,7 @@ app.layout = dbc.Container(
         dcc.Store(id="working-data-store", storage_type="localStorage"),
         dcc.Store(id="df-out-store", storage_type="localStorage"),
         html.Div(
-            "Glider Polar Analysis Tool",
+            "Glider Polar Comparison Tool",
             className="text-primary fs-2",
         ),
         dbc.Row(
