@@ -1188,30 +1188,30 @@ def update_graph(
     ###################################################################
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
-        column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
+        data_set_label = f"{glider_name},{graph_trace_label},d{degree}"
 
         # Check if this configuration already exists
         if df_out is not None:
             existing_configs = df_out.columns.get_level_values(0).unique()
-            if column_name in existing_configs:
+            if data_set_label in existing_configs:
                 logger.warning(
-                    f"Configuration '{column_name}' already saved, skipping duplicate"
+                    f"Configuration '{data_set_label}' already saved, skipping duplicate"
                 )
                 # Skip saving duplicate - or optionally update existing
                 pass  # Remove this block to allow duplicates, or add update logic
             else:
-                df_out[(column_name, "MC")] = df_mc_graph["MC"]
-                df_out[(column_name, "STF")] = df_mc_graph["STF"]
-                df_out[(column_name, "Vavg")] = df_mc_graph["Vavg"]
+                df_out[(data_set_label, "MC")] = df_mc_graph["MC"]
+                df_out[(data_set_label, "STF")] = df_mc_graph["STF"]
+                df_out[(data_set_label, "Vavg")] = df_mc_graph["Vavg"]
         elif df_out is None:
             # Create new DataFrame with MultiIndex columns
             # First level: column name (e.g., "ASW 28 100.0 kg")
             # Second level: metric type ("MC", "STF", "Vavg")
             df_out = pd.DataFrame(
                 {
-                    (column_name, "MC"): df_mc_graph["MC"],
-                    (column_name, "STF"): df_mc_graph["STF"],
-                    (column_name, "Vavg"): df_mc_graph["Vavg"],
+                    (data_set_label, "MC"): df_mc_graph["MC"],
+                    (data_set_label, "STF"): df_mc_graph["STF"],
+                    (data_set_label, "Vavg"): df_mc_graph["Vavg"],
                 }
             )
             logger.debug("created df_out with MultiIndex")
