@@ -27,7 +27,8 @@ from units import ureg
 PA_ = pint_pandas.PintArray
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(name)s: %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s:%(name)s: line: %(lineno)d, %(message)s",
 )
 
 
@@ -1012,12 +1013,9 @@ def update_graph(
             df_out = pd.DataFrame(df_out_data["data"])
             # Reconstruct MultiIndex columns
             df_out.columns = pd.MultiIndex.from_tuples(df_out_data["columns"])
-            # Reattach units to all data columns
+            # Reattach units to all data columns including MC
             for col in df_out.columns:
-                if (
-                    col[0] != "MC"
-                ):  # Don't reattach units to MC column (already has them)
-                    df_out[col] = PA_(df_out[col], ureg.mps)
+                df_out[col] = PA_(df_out[col], ureg.mps)
         else:
             # Legacy format: flat column structure
             df_out = pd.DataFrame(df_out_data)
@@ -1214,7 +1212,20 @@ def update_graph(
     if dash.ctx.triggered_id == "save-comparison-button":
         column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
 
-        if df_out is None:
+        # Check if this configuration already exists
+        if df_out is not None and isinstance(df_out.columns, pd.MultiIndex):
+            existing_configs = df_out.columns.get_level_values(0).unique()
+            if column_name in existing_configs:
+                logger.warning(
+                    f"Configuration '{column_name}' already saved, skipping duplicate"
+                )
+                # Skip saving duplicate - or optionally update existing
+                pass  # Remove this block to allow duplicates, or add update logic
+            else:
+                df_out[(column_name, "MC")] = df_mc_graph["MC"]
+                df_out[(column_name, "STF")] = df_mc_graph["STF"]
+                df_out[(column_name, "Vavg")] = df_mc_graph["Vavg"]
+        elif df_out is None:
             # Create new DataFrame with MultiIndex columns
             # First level: column name (e.g., "ASW 28 100.0 kg")
             # Second level: metric type ("MC", "STF", "Vavg")
@@ -1226,11 +1237,6 @@ def update_graph(
                 }
             )
             logger.debug("created df_out with MultiIndex")
-        else:
-            # Add new columns to existing DataFrame
-            df_out[(column_name, "MC")] = df_mc_graph["MC"]
-            df_out[(column_name, "STF")] = df_mc_graph["STF"]
-            df_out[(column_name, "Vavg")] = df_mc_graph["Vavg"]
 
         logger.debug(df_out.columns)
 
@@ -1434,6 +1440,10 @@ def update_graph(
     # Convert df_out to dict for storage, or None if df_out is None
     # Strip pint units (keep only magnitudes) for localStorage serialization
     if df_out is not None:
+        # MultiIndex serialization: df_out.columns becomes tuple entries in df_out_data_return["columns"],
+        # while df_out_data_return["data"] uses str(col) keys for JSON-safe storage; rehydration later
+        # relies on the preserved order of df_out.columns and the corresponding data values to restore
+        # the original MultiIndex from these tuples.
         if isinstance(df_out.columns, pd.MultiIndex):
             # Serialize MultiIndex structure
             df_out_data_return = {
