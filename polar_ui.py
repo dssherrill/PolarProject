@@ -980,35 +980,37 @@ def update_graph(
     df_out_data,
 ):
     """
-    Compute and return the polar plot, Speed-to-Fly plot, MacCready table data, and other UI outputs based on the current glider, inputs, and stored state.
-
+    Build polar and Speed-to-Fly visualizations, MacCready table data, and manage saved comparison series for the selected glider and current inputs.
+    
     Parameters:
-        data (dict): Working-state values from storage; expected keys include 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert' with SI magnitudes (m, m/s, kg, etc.) as appropriate.
-        degree (int|None): Desired polynomial degree for the polar fit; a value less than 2 or None will be treated as 2.
-        glider_name (str|None): Name of the selected glider; when falsy the application default glider is used.
+        data (dict): Working-state values with keys 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert'. Values are SI magnitudes (e.g., kg, kg/m**2, m/s).
+        degree (int|None): Requested polynomial degree for the polar fit; values less than 2 or None use degree 2.
+        glider_name (str|None): Selected glider name; when falsy the application default is used.
         maccready (float|None): MacCready setting expressed in the currently selected sink units; None is treated as 0.0.
-        goal_function (str): Identifier for the solver goal function used by the polar model.
-        show_debug_graphs (bool): If True, include diagnostic traces (goal function, residuals, solver result) on the graphs.
-        write_excel_file (bool): If True and the app is not in production mode, append saved STF results to an Excel file named "<sanitized glider name> stf.xlsx".
-        save_comparison (bool): Trigger indicating the current STF should be saved into the comparison store.
-        clear_comparison (bool): Trigger indicating previously saved comparison data should be cleared.
-        subtract_compare (str): Comparison display mode; when equal to "Subtracted" and saved data exists, saved STF series are subtracted from the current STF for plotting.
-        compare_metric (str): Metric to use for comparison plotting; either "STF" (Speed-to-Fly) or "Vavg" (Average Speed).
-        units (str): Unit system key, e.g. 'Metric' or 'US', used to choose display units for speed, sink, weight, and pressure.
-        weight_or_loading (str): Mode string selecting whether legends/labels reference 'Pilot Weight' or 'Wing Loading'.
-        df_out_data (dict|None): Serialized saved STF data from localStorage (or None) used to overlay or subtract previously saved series.
-
+        goal_function (str): Identifier of the solver goal function used by the polar model.
+        show_debug_graphs (bool): If True, include diagnostic traces (goal, residuals, solver) on the plots.
+        write_excel_file (bool): If True and running outside production, append saved STF results to an Excel file.
+        save_comparison (bool): Trigger to save the current STF series into the comparison store.
+        clear_comparison (bool): Trigger to clear previously saved comparison data.
+        subtract_compare (str): Comparison display mode; when "Subtracted" and saved data exists, saved series are plotted minus the current series.
+        compare_metric (str): Metric used for comparison plotting; either "STF" or "Vavg".
+        units (str): Unit system key (e.g., 'Metric' or 'US') selecting display units for speed, sink, weight, and pressure.
+        weight_or_loading (str): Labeling mode for legends/labels; expected values include 'Pilot Weight' or 'Wing Loading'.
+        df_out_data (dict|None): Serialized saved STF data previously stored in localStorage (or None).
+    
     Returns:
-        tuple: (glider_name, polar_messages, polar_figure, stf_figure, mc_table_records, mc_table_column_defs, column_size_mode, degree_used, df_out_data_return)
-            - glider_name (str): Displayed glider name used for outputs.
-            - polar_messages (str): Informational or status messages produced by the polar model.
-            - polar_figure (plotly.graph_objs.Figure): Figure containing the polar data and fit (and optional debug traces).
-            - stf_figure (plotly.graph_objs.Figure): Figure containing Speed‑to‑Fly vs MacCready (and optional saved comparison traces).
-            - mc_table_records (list[dict]): MacCready table rows suitable for AG Grid (fields: MC, STF, Vavg, L/D) with values converted to display units.
-            - mc_table_column_defs (list[dict]): AG Grid column definition objects for the MacCready table.
-            - column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit").
-            - degree_used (int): Effective polynomial degree applied (always >= 2).
-            - df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
+        tuple: (
+            glider_name_used (str): Glider name used for display,
+            polar_messages (str): Informational/status messages from the polar model,
+            polar_figure (plotly.graph_objs.Figure): Polar plot (speed vs sink) with fits and optional debug traces,
+            stf_figure (plotly.graph_objs.Figure): Speed‑to‑Fly vs MacCready plot including optional saved-comparison traces,
+            mc_table_records (list[dict]): MacCready table rows (fields: MC, STF, Vavg, L/D) with values converted to display units,
+            mc_table_column_defs (list[dict]): AG Grid column definitions for the MacCready table,
+            column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit"),
+            degree_used (int): Effective polynomial degree applied (always >= 2),
+            df_out_disabled_flag (bool): True if there is no saved comparison data (used to disable Clear Comparison),
+            df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data
+        )
     """
     # Load df_out from store or initialize to None
     # Rehydrate PintArray columns with units
@@ -1188,30 +1190,30 @@ def update_graph(
     ###################################################################
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
-        column_name = f"{glider_name} {graph_trace_label}"  # Degree {degree}"
+        data_set_label = f"{glider_name},{graph_trace_label},d{degree}"
 
         # Check if this configuration already exists
         if df_out is not None:
             existing_configs = df_out.columns.get_level_values(0).unique()
-            if column_name in existing_configs:
+            if data_set_label in existing_configs:
                 logger.warning(
-                    f"Configuration '{column_name}' already saved, skipping duplicate"
+                    f"Configuration '{data_set_label}' already saved, skipping duplicate"
                 )
                 # Skip saving duplicate - or optionally update existing
                 pass  # Remove this block to allow duplicates, or add update logic
             else:
-                df_out[(column_name, "MC")] = df_mc_graph["MC"]
-                df_out[(column_name, "STF")] = df_mc_graph["STF"]
-                df_out[(column_name, "Vavg")] = df_mc_graph["Vavg"]
+                df_out[(data_set_label, "MC")] = df_mc_graph["MC"]
+                df_out[(data_set_label, "STF")] = df_mc_graph["STF"]
+                df_out[(data_set_label, "Vavg")] = df_mc_graph["Vavg"]
         elif df_out is None:
             # Create new DataFrame with MultiIndex columns
             # First level: column name (e.g., "ASW 28 100.0 kg")
             # Second level: metric type ("MC", "STF", "Vavg")
             df_out = pd.DataFrame(
                 {
-                    (column_name, "MC"): df_mc_graph["MC"],
-                    (column_name, "STF"): df_mc_graph["STF"],
-                    (column_name, "Vavg"): df_mc_graph["Vavg"],
+                    (data_set_label, "MC"): df_mc_graph["MC"],
+                    (data_set_label, "STF"): df_mc_graph["STF"],
+                    (data_set_label, "Vavg"): df_mc_graph["Vavg"],
                 }
             )
             logger.debug("created df_out with MultiIndex")
