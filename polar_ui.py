@@ -1,4 +1,3 @@
-import math
 import os
 import re
 
@@ -26,10 +25,16 @@ from units import ureg
 
 PA_ = pint_pandas.PintArray
 logger = logging.getLogger(__name__)
+
+# Configure logging level from environment variable or default to INFO
+log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format="%(asctime)s %(levelname)s:%(name)s: line: %(lineno)d, %(message)s",
 )
+logger.debug(f"Logging configured with level: {log_level_name}")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -988,6 +993,7 @@ def update_graph(
         save_comparison (bool): Trigger indicating the current STF should be saved into the comparison store.
         clear_comparison (bool): Trigger indicating previously saved comparison data should be cleared.
         subtract_compare (str): Comparison display mode; when equal to "Subtracted" and saved data exists, saved STF series are subtracted from the current STF for plotting.
+        compare_metric (str): Metric to use for comparison plotting; either "STF" (Speed-to-Fly) or "Vavg" (Average Speed).
         units (str): Unit system key, e.g. 'Metric' or 'US', used to choose display units for speed, sink, weight, and pressure.
         weight_or_loading (str): Mode string selecting whether legends/labels reference 'Pilot Weight' or 'Wing Loading'.
         df_out_data (dict|None): Serialized saved STF data from localStorage (or None) used to overlay or subtract previously saved series.
@@ -1009,10 +1015,14 @@ def update_graph(
     if df_out_data:
         # Check if data has MultiIndex structure
         if "columns" in df_out_data and "data" in df_out_data:
-            # MultiIndex format: columns is list of tuples, data is dict of lists
-            df_out = pd.DataFrame(df_out_data["data"])
-            # Reconstruct MultiIndex columns
-            df_out.columns = pd.MultiIndex.from_tuples(df_out_data["columns"])
+            # MultiIndex format: Use positional mapping to preserve column order
+            # Map each tuple-column from df_out_data["columns"] to its data list
+            column_tuples = [tuple(col) for col in df_out_data["columns"]]
+            data_lists = [df_out_data["data"][str(col)] for col in column_tuples]
+            # Build DataFrame using explicit tuple-to-data pairing via zip
+            data_dict = dict(zip(column_tuples, data_lists))
+            df_out = pd.DataFrame(data_dict)
+            # Columns are already MultiIndex from dict keys (tuples)
             # Reattach units to all data columns including MC
             for col in df_out.columns:
                 df_out[col] = PA_(df_out[col], ureg.mps)
