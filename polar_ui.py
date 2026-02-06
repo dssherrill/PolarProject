@@ -194,20 +194,234 @@ graph_style = {
 full_width_class = "d-flex w-100 justify-content-left bg-light"  # p-3"
 
 
-def add_graph(graph_id):
-    """Create a Graph component with the specified ID."""
+def add_weight_choice():
+    """
+    Render the weight selection card used to choose between pilot weight and wing loading.
+    
+    The card includes a radio control to select either "Pilot Weight" or "Wing Loading", the corresponding numeric input (only one is shown at a time), and the polynomial degree control.
+    
+    Returns:
+        html.Div: A Dash container representing the weight choice card with radio selector, pilot-weight and wing-loading inputs, and an embedded polynomial degree input.
+    """
     return html.Div(
         [
-            dcc.Graph(
-                figure={},
-                id=graph_id,
+            dbc.Card(
+                [
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                [
+                                    dbc.Stack(
+                                        [
+                                            dbc.Label(
+                                                "Select:",
+                                                html_for="radio-weight-or-loading",
+                                                id="input-choice-prompt",
+                                                className="text-primary fs-5",
+                                            ),
+                                            dbc.RadioItems(
+                                                options=[
+                                                    "Pilot Weight",
+                                                    "Wing Loading",
+                                                ],
+                                                value="Wing Loading",
+                                                inline=False,
+                                                id="radio-weight-or-loading",
+                                                persistence=True,
+                                                persistence_type="local",
+                                                className="ms-3",
+                                            ),
+                                            #
+                                            #  One of the next two inputs, either pilot weight or wing loading, will be shown
+                                            # but not both.
+                                            #
+                                            html.Div(
+                                                [
+                                                    dbc.Row(
+                                                        [
+                                                            dbc.Col(
+                                                                [
+                                                                    # --- pilot weight
+                                                                    dcc.Input(
+                                                                        id="pilot-weight-input",
+                                                                        type="number",
+                                                                        placeholder="100",
+                                                                        debounce=0.75,
+                                                                        persistence=True,
+                                                                        persistence_type="local",
+                                                                        className="ms-3 mt-6",
+                                                                    ),
+                                                                    html.Br(),
+                                                                    dbc.Label(
+                                                                        "Pilot + Ballast weight (kg):",
+                                                                        html_for="pilot-weight-input",
+                                                                        id="pilot-weight-label",
+                                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                                    ),
+                                                                ],
+                                                                className="w-100 mt-auto",
+                                                            ),
+                                                        ],
+                                                    ),
+                                                ],
+                                                style={"text-align": "right"},
+                                                className="mt-6",
+                                                id="pilot-weight-row",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    # --- wing loading
+                                                    dcc.Input(
+                                                        id="wing-loading-input",
+                                                        type="number",
+                                                        placeholder="100",
+                                                        debounce=0.75,
+                                                        persistence=True,
+                                                        persistence_type="local",
+                                                        className="ms-3 mt-6",
+                                                    ),
+                                                    html.Br(),
+                                                    dbc.Label(
+                                                        "Wing Loading (kg/m²)",
+                                                        html_for="wing-loading-input",
+                                                        id="wing-loading-label",
+                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                    ),
+                                                ],
+                                                style={"text-align": "right"},
+                                                className="mt-6",
+                                                id="wing-loading-row",
+                                            ),
+                                        ],
+                                        direction="horizontal",
+                                        className="w-100 hstack gap-3 m-3",
+                                    ),
+                                ],
+                                width=True,
+                            ),
+                        ],
+                    ),
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dbc.Stack(
+                                    [
+                                        add_polynomial_degree(),
+                                    ]
+                                ),
+                                className="m-3 mt-auto",
+                                width=True,
+                            ),
+                        ],
+                    ),
+                ],
+                className="border-primary mt-3 w-100",
+            ),
+        ],
+        className="w-100",
+    )
+
+
+def add_polynomial_degree():
+    """
+    Create a labeled numeric input control for selecting the polynomial fit degree.
+    
+    Returns:
+        html.Div: A container with a "Polynomial degree" label and a numeric input (min 2) whose placeholder shows the default degree.
+    """
+    return html.Div(
+        [
+            # --- Polynomial degree
+            dbc.Label(
+                ["Polynomial", html.Br(), "degree:"],
+                html_for="poly-degree",
+                className="text-primary fs-5",
+            ),
+            dcc.Input(
+                id="poly-degree",
+                type="number",
+                placeholder=DEFAULT_POLYNOMIAL_DEGREE,
+                min=2,
+                className="text-start",
+                debounce=0.75,
+            ),
+        ],
+        className="w-100",
+    )
+
+
+def add_polynomial_statistics():
+    """Create a container for polynomial statistics display."""
+    return html.Div(
+        [
+            dbc.Card(
+                [
+                    dbc.CardBody(
+                        [
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        [
+                                            dbc.Label(
+                                                "Polynomial fit results:",
+                                                className="text-primary fs-5",
+                                                html_for="statistics",
+                                            ),
+                                        ]
+                                    ),
+                                ]
+                            ),
+                            dbc.Row(
+                                [
+                                    dbc.Col(
+                                        [
+                                            dcc.Markdown(
+                                                "Statistics",
+                                                style={
+                                                    "whiteSpace": "pre-line",
+                                                    # "fontFamily": "Courier, serif",
+                                                },
+                                                id="statistics",
+                                                mathjax=True,  # Enable LaTeX rendering
+                                                dangerously_allow_html=True,
+                                                className="text-start",
+                                            ),  # enable html display without purify
+                                        ]
+                                    )
+                                ]
+                            ),
+                        ],
+                    ),
+                ],
+                className="border-primary mt-3 w-100",
             )
         ],
+        className="w-100",
+    )
+
+
+def add_graph(graph_id):
+    """
+    Create a Dash Graph container with the given component id.
+    
+    Parameters:
+        graph_id (str): The id to assign to the contained dcc.Graph component.
+    
+    Returns:
+        html.Div: A Div wrapping a dcc.Graph configured with the provided id.
+    """
+    return html.Div(
+        [dcc.Graph(figure={}, id=graph_id, className="mt-3")],
     )
 
 
 def add_mc_aggrid():
-    """Create an AG Grid component with the specified ID."""
+    """
+    Builds the AG Grid container used to display the MacCready table.
+    
+    Returns:
+        html.Div: A Div containing an AgGrid configured for automatic height and full width with id "mcAgGrid".
+    """
     return html.Div(
         [
             dag.AgGrid(
@@ -220,102 +434,210 @@ def add_mc_aggrid():
     )
 
 
-def add_compare_controls():
+def add_subtract_choice():
     """
-    Create a Dash HTML container with controls to save and clear Speed-to-Fly (STF) results and to choose the comparison display mode.
-
-    The container includes:
-    - a "Save for Comparison" button,
-    - a "Clear Comparison" button,
-    - a radio control with options "Raw" and "Subtracted" (default "Subtracted") to select how saved comparisons are displayed.
-
+    Build a labeled radio control used to toggle between showing original comparison series or their subtracted differences.
+    
+    The control contains a label "Show:" and a RadioItems component with options "Originals" and "Subtracted", defaulting to "Originals" and persisted locally.
+    
     Returns:
-        html.Div: A Dash HTML container with the comparison buttons and radio items.
+        html.Div: A Dash container holding the label and the radio selection (id "radio-subtract-compare").
     """
     return html.Div(
         [
-            dbc.Stack(
-                [
-                    dbc.Button(
-                        "Save for Comparison",
-                        id="save-comparison-button",
-                        className="m-2",
-                        # color="secondary",
-                    ),
-                    dbc.Button(
-                        "Clear Comparison",
-                        id="clear-comparison-button",
-                        className="m-2",
-                        # color="secondary",
-                        disabled=True,
-                    ),
-                    dbc.Label(
-                        "Display:",
-                        className="text-primary fs-4",
-                    ),
-                    dbc.RadioItems(
-                        options=["Raw", "Subtracted"],
-                        value="Subtracted",
-                        inline=False,
-                        id="radio-subtract-compare",
-                        persistence=True,
-                        persistence_type="local",
-                    ),
-                    dbc.Label(
-                        "Compare:",
-                        className="text-primary fs-4",
-                    ),
-                    dbc.RadioItems(
-                        options=[
-                            {"label": "Speed-to-Fly", "value": "STF"},
-                            {"label": "Average Speed", "value": "Vavg"},
-                        ],
-                        value="STF",
-                        inline=False,
-                        id="radio-compare-metric",
-                        persistence=True,
-                        persistence_type="local",
-                    ),
-                ],
-                direction="horizontal",
-                className="hstack gap-3 m-3",
-            ),
-        ],
-        className="d-flex align-items-start m-3",
-    )
-
-
-def add_compare_options():
-    """
-    Render the comparison option controls for STF plotting mode selection.
-
-    Returns:
-        tuple: Two Bootstrap column components:
-            - A `dbc.Col` containing a label for the option selector.
-            - A `dbc.Col` containing a `dbc.RadioItems` with choices "Raw" and "Subtracted" (default "Subtracted") and local persistence.
-    """
-    # return html.Div(
-    #     [
-    return (
-        dbc.Col(
             dbc.Label(
-                "Option:",
-                className="text-primary fs-4",
+                "Show:",
+                className="text-primary fs-5",
+                html_for="radio-subtract-compare",
             ),
-            md=3,
-        ),
-        dbc.Col(
             dbc.RadioItems(
-                options=["Raw", "Subtracted"],
-                value="Subtracted",
+                options=["Originals", "Subtracted"],
+                value="Originals",
                 inline=False,
                 id="radio-subtract-compare",
                 persistence=True,
                 persistence_type="local",
             ),
-            md=3,
+        ]
+    )
+
+
+def add_card_stack(html_text):
+    """
+    Wrap the provided content in a horizontal card stack inside a Div.
+    
+    Parameters:
+        html_text: Dash/HTML component or string to be placed inside the card body.
+    
+    Returns:
+        A dash_html_components.Div containing a horizontal stack with a single primary-bordered Card that holds the provided content.
+    """
+    return html.Div(
+        [
+            dbc.Row(
+                dbc.Stack(
+                    [
+                        dbc.Card(
+                            [dbc.CardBody(html_text, className="w-100")],
+                            className="border-primary w-100",
+                        )  # Adds border color and margin
+                    ],
+                    direction="horizontal",
+                    className="d-flex hstack w-100",  # gap-3 m-3 align-items-start",
+                ),
+            ),
+        ],
+    )
+
+
+def add_compare_buttons():
+    """
+    Create a horizontal pair of comparison control buttons.
+    
+    Returns:
+        dbc.Stack: A horizontal Bootstrap stack containing two buttons:
+            - "Save for Comparison" with id "save-comparison-button".
+            - "Clear Comparison" with id "clear-comparison-button" (initially disabled).
+    """
+    return (
+        dbc.Stack(
+            [
+                dbc.Button(
+                    "Save for Comparison",
+                    id="save-comparison-button",
+                    # className="m-2",
+                    # color="secondary",
+                ),
+                dbc.Button(
+                    "Clear Comparison",
+                    id="clear-comparison-button",
+                    # className="m-2",
+                    # color="secondary",
+                    disabled=True,
+                ),
+            ],
+            direction="horizontal",
+            className="hstack gap-3 m-3 justify-content-evenly",
         ),
-        #        ],
+    )
+
+
+def add_units_selection():
+    """
+    Create a card containing a labeled radio control for selecting the unit system.
+    
+    The control offers "Metric" and "US" options, defaults to "Metric", and persists the user's choice to local storage.
+    
+    Returns:
+        html.Div: A Dash HTML container wrapping a Bootstrap Card with the labeled RadioItems control (id="radio-units").
+    """
+    return html.Div(
+        [
+            dbc.Card(
+                dbc.Stack(
+                    [
+                        dbc.Label(
+                            "Units:",
+                            className="text-primary fs-5",
+                            html_for="radio-units",
+                        ),
+                        dbc.RadioItems(
+                            options=["Metric", "US"],
+                            value="Metric",
+                            inline=False,
+                            id="radio-units",
+                            persistence=True,
+                            persistence_type="local",
+                            className="ms-3",
+                        ),
+                    ],
+                    direction="horizontal",
+                    className="hstack m-3",  # gap-3 m-3 align-items-start",
+                ),
+                className="border-primary mt-3 w-100",
+            ),
+        ],
+    )
+
+
+def add_metric_choice():
+    """
+    Create a control for selecting the comparison metric shown in the UI.
+    
+    The control presents a labeled radio group with two choices: "Speed-to-Fly" and "Average Speed".
+    The radio items persist their selection locally and default to "STF".
+    
+    Returns:
+        html.Div: A Dash container holding the label and radio items; the radio value is `"STF"` or `"Vavg"`.
+    """
+    return html.Div(
+        [
+            dbc.Label(
+                "Compare:",
+                className="text-primary fs-5",
+                html_for="radio-compare-metric",
+            ),
+            dbc.RadioItems(
+                options=[
+                    {"label": "Speed-to-Fly", "value": "STF"},
+                    {"label": "Average Speed", "value": "Vavg"},
+                ],
+                value="STF",
+                inline=False,
+                id="radio-compare-metric",
+                persistence=True,
+                persistence_type="local",
+            ),
+        ]
+    )
+
+
+def add_compare_controls():
+    """
+    Builds a container with controls for saving/clearing Speed-to-Fly (STF) comparison data and selecting how comparisons are displayed.
+    
+    The container includes a "Save for Comparison" button, a "Clear Comparison" button, a radio control to choose between showing saved series as "Originals" or "Subtracted", and a metric-selection control.
+    
+    Returns:
+        html.Div: A Dash HTML container holding the comparison buttons and display-mode controls.
+    """
+    return html.Div(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        [
+                            dbc.Stack(
+                                [
+                                    dbc.Row(dbc.Col(add_compare_buttons())),
+                                    dbc.Row(
+                                        dbc.Col(
+                                            dbc.Stack(
+                                                [
+                                                    add_card_stack(
+                                                        add_subtract_choice()
+                                                    ),
+                                                    add_card_stack(add_metric_choice()),
+                                                ],
+                                                direction="horizontal",
+                                                className="flex-wrap w-100 hstack gap-3 justify-content-evenly",
+                                            ),
+                                        ),
+                                        justify="evenly",
+                                    ),
+                                ],
+                                direction="vertical",
+                                className="vstack gap-3",
+                            ),
+                        ],
+                        className="d-flex align-items-start m-3",
+                    ),
+                ],
+                className="border-primary w-100",
+            )
+        ],
+        # style={"border": "2px solid #ccc", "padding": "10px", "border-radius": "5px"},
+        # className="border-primary mt-3 w-100",
     )
 
 
@@ -348,7 +670,11 @@ app.layout = dbc.Container(
                 # Input controls group
                 dbc.Col(
                     [
-                        html.Label("Select a glider:"),
+                        dbc.Label(
+                            "Select a glider:",
+                            className="text-primary fs-5",
+                            html_for="glider-dropdown",
+                        ),
                         dcc.Dropdown(
                             id="glider-dropdown",
                             options=dropdown_options,
@@ -357,6 +683,8 @@ app.layout = dbc.Container(
                             persistence=True,
                             persistence_type="local",
                             style={"width": "100%"},
+                            className="mb-3",
+                            maxHeight=300,
                         ),
                         dag.AgGrid(
                             rowData=initial_glider_data.to_dict("records"),
@@ -370,182 +698,57 @@ app.layout = dbc.Container(
                             # dashGridOptions={"pagination": False},
                             style={"width": "100%"},
                             id="glider_AgGrid",
-                            # className=full_width_class,
-                        ),
-                        # --- Unit selection
-                        html.Div(
-                            [
-                                dbc.Label(
-                                    "Units:",
-                                    className="text-primary fs-4",
-                                ),
-                                dbc.RadioItems(
-                                    options=["Metric", "US"],
-                                    value="Metric",
-                                    inline=False,
-                                    id="radio-units",
-                                    persistence=True,
-                                    persistence_type="local",
-                                ),
-                            ],
-                        ),
-                        # --- Input choices
-                        dbc.Label(
-                            "Input Option:",
-                            html_for="radio-weight-or-loading",
-                            id="input-choice-prompt",
-                            style={
-                                "margin-top": "15px",
-                                "width": 450,
-                            },
-                            className="text-primary fs-4",
-                        ),
-                        dbc.RadioItems(
-                            options=[
-                                "Pilot Weight",
-                                "Wing Loading",
-                            ],
-                            value="Wing Loading",
-                            inline=False,
-                            id="radio-weight-or-loading",
-                            persistence=True,
-                            persistence_type="local",
-                        ),
-                        #
-                        #  One of the next two inputs, either pilot weight or wing loading, will be shown
-                        # but not both.
-                        #
-                        html.Div(
-                            [
-                                # --- pilot weight
-                                dbc.Label(
-                                    "Pilot + Ballast weight (kg):",
-                                    html_for="pilot-weight-input",
-                                    id="pilot-weight-label",
-                                    style={
-                                        "margin-top": "15px",
-                                        "width": 450,
-                                    },
-                                ),
-                                dcc.Input(
-                                    id="pilot-weight-input",
-                                    type="number",
-                                    placeholder="100",
-                                    style={"margin-end": 100, "width": 450},
-                                    debounce=0.75,
-                                    persistence=True,
-                                    persistence_type="local",
-                                ),
-                            ],
-                            className="mb-3",
-                            id="pilot-weight-row",
-                        ),
-                        html.Div(
-                            [
-                                # --- wing loading
-                                dbc.Label(
-                                    "Wing Loading (kg/m²)",
-                                    html_for="wing-loading-input",
-                                    id="wing-loading-label",
-                                    style={
-                                        "margin-top": "15px",
-                                        "width": 450,
-                                    },
-                                ),
-                                dcc.Input(
-                                    id="wing-loading-input",
-                                    type="number",
-                                    placeholder="100",
-                                    style={"margin-end": 100, "width": 450},
-                                    debounce=0.75,
-                                    persistence=True,
-                                    persistence_type="local",
-                                ),
-                            ],
-                            className="mb-3",
-                            id="wing-loading-row",
+                            className="mb-3 ag-theme-alpine",
                         ),
                     ],
-                    md=3,
+                    md=4,
                 ),
-                dbc.Col(
-                    [
-                        # --- Polynomial degree
-                        dbc.Row(
-                            [
-                                dbc.Label(
-                                    "Polynomial degree:",
-                                    html_for="poly-degree",
-                                    className="text-start",
-                                ),
-                            ]
-                        ),
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    [
-                                        dcc.Input(
-                                            id="poly-degree",
-                                            type="number",
-                                            placeholder=DEFAULT_POLYNOMIAL_DEGREE,
-                                            min=2,
-                                            className="text-start",
-                                            debounce=0.75,
-                                        ),  # style={"width": "1"}),
-                                    ]
-                                ),  # width=10),
-                            ]
-                        ),
-                        # Statistics output group
-                        dbc.Row(
-                            [
-                                html.Br(),
-                                dcc.Markdown(
-                                    "Statistics",
-                                    style={
-                                        "whiteSpace": "pre-line",
-                                        "fontFamily": "Courier, serif",
-                                    },
-                                    id="statistics",
-                                    mathjax=True,  # Enable LaTeX rendering
-                                    dangerously_allow_html=True,
-                                    className="text-start",
-                                ),  # enable html display without purify
-                            ],
-                            # width={"size": 2, "offset": 1},
-                            # className="mt-3 mb-3",
-                            className=full_width_class,
-                        ),
-                    ],
-                    # width=5,
-                ),
-                # dbc.Col(
-                #     html.Div("Additional Info"),
-                #     # width=2
-                # ),
             ],
             className=full_width_class,
         ),
         # --- Graphs
-        html.Br(),
         dbc.Row(
-            [add_compare_controls()],
+            [
+                dbc.Col(
+                    #                    add_compare_controls(),
+                ),  # align="center"),
+            ],
             className=full_width_class,
         ),
         html.Br(),
         dbc.Row(
             [
                 dbc.Col(
-                    add_graph("graph-polar"),
+                    [
+                        add_units_selection(),
+                        add_weight_choice(),
+                        add_graph("graph-polar"),
+                    ],
                     md=4,
+                    className="mt-auto m-1",  # border-primary",  # force content to the bottom of the column
+                    style={
+                        "border": "2px solid #ccc",
+                        "padding": "10px",
+                        "border-radius": "5px",
+                    },
                 ),
                 dbc.Col(
-                    add_graph("graph-stf"),
+                    [
+                        add_compare_controls(),
+                        add_graph("graph-stf"),
+                    ],
                     md=4,
+                    className="mt-auto m-1",  # force content to the bottom of the column
+                    style={
+                        "border": "2px solid #ccc",
+                        "padding": "10px",
+                        "border-radius": "5px",
+                    },
                 ),
                 dbc.Col(
                     add_mc_aggrid(),
-                    md=4,
+                    md=3,
+                    className="mt-auto",  # force content to the bottom of the column
                 ),
             ],
             className=full_width_class,
@@ -598,6 +801,12 @@ app.layout = dbc.Container(
                 "flex": "1 1 100%",
             },
             className="d-none",  # TODO: enable later
+        ),
+        #####
+        # End of the Graph row
+        #####
+        dbc.Row(
+            dbc.Col([add_polynomial_statistics()], className="w-100"), className="w-100"
         ),
         dbc.Row(
             [
@@ -706,35 +915,39 @@ def process_unit_change(
     data,
 ):
     """
-    Process unit changes and update glider parameters based on user input.
-    Handles unit system selection and manages pilot weight/wing loading inputs,
-    converting between different unit systems and calculating derived values.
-    Args:
-        units (str): Selected unit system (e.g., 'Metric', 'US').
-        weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
-        glider_name (str): Name of the selected glider.
-        pilot_weight_in (float): Pilot weight input value in selected units.
-        wing_loading_in (float): Wing loading input value in selected units.
-        v_air_horiz_in (float): Horizontal airmass speed input in selected units.
-        v_air_vert_in (float): Vertical airmass speed input in selected units.
-        data (dict): Stored state data containing pilot_weight, wing_loading, v_air_horiz, v_air_vert.
+    Update UI state and unit-aware values when the unit system, weight input mode, or related inputs change.
+    
+    Convert and synchronize pilot weight, wing loading, and airmass speeds to the selected units; compute derived quantities (gross weight and minimum wing loading); produce display labels, placeholders, and a glider-spec table suitable for the UI; and return updated stored-state payloads.
+    
+    Parameters:
+        units: Selected unit system name (e.g., "Metric" or "US").
+        weight_or_loading: Which input mode is active ("Pilot Weight" or "Wing Loading").
+        glider_name: Selected glider name; defaults to the application's default glider when omitted.
+        pilot_weight_in: User-entered pilot weight in the selected units, or None.
+        wing_loading_in: User-entered wing loading in the selected units, or None.
+        v_air_horiz_in: User-entered horizontal airmass speed in the selected units, or None.
+        v_air_vert_in: User-entered vertical airmass (sink) speed in the selected units, or None.
+        data: Previously stored state dictionary with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
+    
     Returns:
-        tuple: A tuple containing:
-            - glider_data (list): DataFrame records with glider weight and loading specifications.
-            - horizontal_speed_label (str): Label for horizontal speed input field.
-            - vertical_speed_label (str): Label for vertical speed input field.
-            - pilot_weight_label (str): Label for pilot weight input field.
-            - pilot_weight_placeholder (str): Placeholder text for pilot weight input.
-            - pilot_weight_value (float): Current pilot weight value in selected units.
-            - wing_loading_label (str): Label for wing loading input field.
-            - wing_loading_placeholder (str): Placeholder text for wing loading input.
-            - wing_loading_value (float): Current wing loading value in selected units.
-            - min_wing_loading_display (float): Minimum wing loading constraint.
-            - v_air_horiz (float): Horizontal airmass speed in m/s.
-            - v_air_vert (float): Vertical airmass speed in m/s.
-            - data_store (dict): Updated state dictionary with current values.
+        A tuple with the following items, in order:
+        - glider_data (list): Records for the glider info table (labels and Metric/US formatted values).
+        - horizontal_speed_label (str): Label text for the horizontal speed input.
+        - vertical_speed_label (str): Label text for the vertical speed input.
+        - pilot_weight_label (str): Label text for the pilot weight input (includes unit).
+        - pilot_weight_placeholder (str): Placeholder text for the pilot weight input (reference value).
+        - pilot_weight_value (float|None): Pilot weight converted to the selected weight units, rounded to one decimal, or None.
+        - wing_loading_label (str): Label text for the wing loading input (includes unit and minimum).
+        - wing_loading_placeholder (str): Placeholder text for the wing loading input (reference value).
+        - wing_loading_value (float|None): Wing loading converted to the selected pressure units, rounded to one decimal, or None.
+        - min_wing_loading_display (float): Minimum allowable wing loading displayed in the current units.
+        - v_air_horiz (float|None): Horizontal airmass speed converted to the selected speed units, rounded to one decimal, or None.
+        - v_air_vert (float|None): Vertical airmass (sink) speed converted to the selected sink units, rounded to one decimal, or None.
+        - data_store (dict): Minimal stored-state dictionary with raw magnitudes for "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
+        - detailed_store (dict): Internal detailed-store dictionary with working values' magnitudes (pilot_weight, wing_loading, v_air_horiz, v_air_vert).
+    
     Raises:
-        dash.exceptions.PreventUpdate: If no glider is selected or glider info is empty.
+        dash.exceptions.PreventUpdate: If no matching glider information is available for the selected glider.
     """
     logger.info(
         f"process_unit_change called with units={units}, weight_or_loading={weight_or_loading}, glider_name={glider_name}, pilot_weight_in={pilot_weight_in}, wing_loading_in={wing_loading_in}, v_air_horiz_in={v_air_horiz_in}, v_air_vert_in={v_air_vert_in}, data={data}"
@@ -834,8 +1047,8 @@ def process_unit_change(
             working_pilot_weight = gross_weight - current_glider.empty_weight()
             pilot_weight = working_pilot_weight.magnitude
 
-    pilot_weight_label = f"Pilot + Ballast weight ({weight_units.units:~P}):"
-    wing_loading_label = f"Wing Loading ({pressure_units.units:~P}), min {min_wing_loading_display} {pressure_units.units:~P}:"
+    pilot_weight_label = f"Min 0.0 {weight_units.units:~P} (Pilot + Ballast)"
+    wing_loading_label = f"Min {min_wing_loading_display} {pressure_units.units:~P}"
 
     pilot_weight_placeholder = (
         f"{current_glider.reference_pilot_weight().to(weight_units).magnitude:.1f}"
@@ -980,7 +1193,7 @@ def update_graph(
     df_out_data,
 ):
     """
-    Build polar and Speed-to-Fly visualizations, MacCready table data, and manage saved comparison series for the selected glider and current inputs.
+    Compute polar and Speed‑to‑Fly figures, generate MacCready table data, and handle saving/clearing of STF comparison series for the selected glider and current inputs.
     
     Parameters:
         data (dict): Working-state values with keys 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert'. Values are SI magnitudes (e.g., kg, kg/m**2, m/s).
@@ -999,18 +1212,17 @@ def update_graph(
         df_out_data (dict|None): Serialized saved STF data previously stored in localStorage (or None).
     
     Returns:
-        tuple: (
-            glider_name_used (str): Glider name used for display,
-            polar_messages (str): Informational/status messages from the polar model,
-            polar_figure (plotly.graph_objs.Figure): Polar plot (speed vs sink) with fits and optional debug traces,
-            stf_figure (plotly.graph_objs.Figure): Speed‑to‑Fly vs MacCready plot including optional saved-comparison traces,
-            mc_table_records (list[dict]): MacCready table rows (fields: MC, STF, Vavg, L/D) with values converted to display units,
-            mc_table_column_defs (list[dict]): AG Grid column definitions for the MacCready table,
-            column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit"),
-            degree_used (int): Effective polynomial degree applied (always >= 2),
-            df_out_disabled_flag (bool): True if there is no saved comparison data (used to disable Clear Comparison),
-            df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data
-        )
+        tuple:
+            glider_name_used (str): Glider name used for display.
+            polar_messages (str): Informational/status messages from the polar model.
+            polar_figure (plotly.graph_objs.Figure): Polar plot (speed vs sink) with fits and optional debug traces.
+            stf_figure (plotly.graph_objs.Figure): Speed‑to‑Fly vs MacCready plot including optional saved-comparison traces.
+            mc_table_records (list[dict]): MacCready table rows (fields: MC, STF, Vavg, L/D) with values converted to display units.
+            mc_table_column_defs (list[dict]): AG Grid column definitions for the MacCready table.
+            column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit").
+            degree_used (int): Effective polynomial degree applied (always >= 2).
+            df_out_disabled_flag (bool): True if there is no saved comparison data (used to disable Clear Comparison).
+            df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
     """
     # Load df_out from store or initialize to None
     # Rehydrate PintArray columns with units
@@ -1121,7 +1333,7 @@ def update_graph(
     trace_weight_adjusted = go.Scatter(
         x=mc_graph_values_converted,
         y=stf_graph_values,
-        name="Speed-to-Fly",
+        name="STF",
         mode="lines",
         visible="legendonly" if subtract_active else True,
     )
@@ -1139,7 +1351,7 @@ def update_graph(
     trace_stf = go.Scatter(
         x=df_mc_graph["MC"].pint.to(sink_units).pint.magnitude,
         y=y,
-        name="Average Speed",
+        name="V<sub>avg</sub>",
         mode="lines",
         visible="legendonly" if subtract_active else True,
     )
@@ -1187,6 +1399,7 @@ def update_graph(
                 secondary_y=False,
             )
 
+    data_set_label = f"{glider_name},{graph_trace_label},d{degree}"
     ###################################################################
     # Collect results when requested
     if dash.ctx.triggered_id == "save-comparison-button":
@@ -1244,16 +1457,21 @@ def update_graph(
             secondary_y=True,
         )
 
+    stf_graph_title = {
+        "text": "MacCready Speed-to-Fly and Average Speed",
+        "y": 0.9,
+        "x": 0.5,
+        "xanchor": "center",
+        "yanchor": "top",
+    }
+
+    if subtract_active:
+        stf_graph_title["subtitle"] = {"text": f"Subtracting {data_set_label}"}
+
     stf_graph.update_layout(
         xaxis_title=f"MacCready Setting ({sink_units.units:~P})",
         yaxis_title=f"Speed ({speed_units.units:~P})",
-        title={
-            "text": "MacCready Speed-to-Fly",
-            "y": 0.9,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top",
-        },
+        title=stf_graph_title,
         yaxis2=dict(
             title="Solver Result",  # Title for the second (right) vertical axis
             overlaying="y",
@@ -1261,6 +1479,7 @@ def update_graph(
         ),
         legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
     )
+
     ###################################################################
     # Calculate MacCready table data
     if sink_units == ureg("m/s"):
@@ -1440,7 +1659,7 @@ def update_graph(
 
     logger.debug("update_graph return\n")
     return (
-        glider_name,
+        "",  # glider_name,
         current_polar.messages(),
         polar_graph,
         stf_graph,
@@ -1458,6 +1677,7 @@ def update_graph(
 ##################################################################
 # Run the app
 if __name__ == "__main__":
+    addr = os.environ.get("POLAR_PLOT_ADDR", "localhost")
     port = int(os.environ.get("PORT", 8050))
     debug = os.environ.get("DEBUG", "").lower() in ("true", "1", "yes")
 
@@ -1475,9 +1695,9 @@ if __name__ == "__main__":
 
     if not _production_mode:
         logger.info(
-            f"Starting development server at http://localhost:{port}, debug={debug}, production_mode={_production_mode}"
+            f"Starting development server at http://{addr}:{port}, debug={debug}, production_mode={_production_mode}"
         )
-        app.run(debug=debug)
+        app.run(host=addr, port=port, debug=debug)
     else:
         logger.info(
             f"Starting production server on port {port}, debug={debug}, production_mode={_production_mode}"

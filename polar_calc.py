@@ -296,7 +296,7 @@ class Polar:
                 SSE_val = 0.0
 
         MSE = SSE_val / n_data_points
-        self.__messages += f"MSE = {MSE:.3}"
+        self.__messages += f"MSE = {MSE:.3}\n"
 
         logger.info(f"{self.__messages}")
 
