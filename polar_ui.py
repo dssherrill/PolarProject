@@ -195,6 +195,14 @@ full_width_class = "d-flex w-100 justify-content-left bg-light"  # p-3"
 
 
 def add_weight_choice():
+    """
+    Render the weight selection card used to choose between pilot weight and wing loading.
+    
+    The card includes a radio control to select either "Pilot Weight" or "Wing Loading", the corresponding numeric input (only one is shown at a time), and the polynomial degree control.
+    
+    Returns:
+        html.Div: A Dash container representing the weight choice card with radio selector, pilot-weight and wing-loading inputs, and an embedded polynomial degree input.
+    """
     return html.Div(
         [
             dbc.Card(
@@ -315,6 +323,12 @@ def add_weight_choice():
 
 
 def add_polynomial_degree():
+    """
+    Create a labeled numeric input control for selecting the polynomial fit degree.
+    
+    Returns:
+        html.Div: A container with a "Polynomial degree" label and a numeric input (min 2) whose placeholder shows the default degree.
+    """
     return html.Div(
         [
             # --- Polynomial degree
@@ -387,14 +401,27 @@ def add_polynomial_statistics():
 
 
 def add_graph(graph_id):
-    """Create a Graph component with the specified ID."""
+    """
+    Create a Dash Graph container with the given component id.
+    
+    Parameters:
+        graph_id (str): The id to assign to the contained dcc.Graph component.
+    
+    Returns:
+        html.Div: A Div wrapping a dcc.Graph configured with the provided id.
+    """
     return html.Div(
         [dcc.Graph(figure={}, id=graph_id, className="mt-3")],
     )
 
 
 def add_mc_aggrid():
-    """Create an AG Grid component with the specified ID."""
+    """
+    Builds the AG Grid container used to display the MacCready table.
+    
+    Returns:
+        html.Div: A Div containing an AgGrid configured for automatic height and full width with id "mcAgGrid".
+    """
     return html.Div(
         [
             dag.AgGrid(
@@ -408,6 +435,14 @@ def add_mc_aggrid():
 
 
 def add_subtract_choice():
+    """
+    Build a labeled radio control used to toggle between showing original comparison series or their subtracted differences.
+    
+    The control contains a label "Show:" and a RadioItems component with options "Originals" and "Subtracted", defaulting to "Originals" and persisted locally.
+    
+    Returns:
+        html.Div: A Dash container holding the label and the radio selection (id "radio-subtract-compare").
+    """
     return html.Div(
         [
             dbc.Label(
@@ -428,6 +463,15 @@ def add_subtract_choice():
 
 
 def add_card_stack(html_text):
+    """
+    Wrap the provided content in a horizontal card stack inside a Div.
+    
+    Parameters:
+        html_text: Dash/HTML component or string to be placed inside the card body.
+    
+    Returns:
+        A dash_html_components.Div containing a horizontal stack with a single primary-bordered Card that holds the provided content.
+    """
     return html.Div(
         [
             dbc.Row(
@@ -447,6 +491,14 @@ def add_card_stack(html_text):
 
 
 def add_compare_buttons():
+    """
+    Create a horizontal pair of comparison control buttons.
+    
+    Returns:
+        dbc.Stack: A horizontal Bootstrap stack containing two buttons:
+            - "Save for Comparison" with id "save-comparison-button".
+            - "Clear Comparison" with id "clear-comparison-button" (initially disabled).
+    """
     return (
         dbc.Stack(
             [
@@ -471,6 +523,14 @@ def add_compare_buttons():
 
 
 def add_units_selection():
+    """
+    Create a card containing a labeled radio control for selecting the unit system.
+    
+    The control offers "Metric" and "US" options, defaults to "Metric", and persists the user's choice to local storage.
+    
+    Returns:
+        html.Div: A Dash HTML container wrapping a Bootstrap Card with the labeled RadioItems control (id="radio-units").
+    """
     return html.Div(
         [
             dbc.Card(
@@ -501,6 +561,15 @@ def add_units_selection():
 
 
 def add_metric_choice():
+    """
+    Create a control for selecting the comparison metric shown in the UI.
+    
+    The control presents a labeled radio group with two choices: "Speed-to-Fly" and "Average Speed".
+    The radio items persist their selection locally and default to "STF".
+    
+    Returns:
+        html.Div: A Dash container holding the label and radio items; the radio value is `"STF"` or `"Vavg"`.
+    """
     return html.Div(
         [
             dbc.Label(
@@ -525,15 +594,12 @@ def add_metric_choice():
 
 def add_compare_controls():
     """
-    Create a Dash HTML container with controls to save and clear Speed-to-Fly (STF) results and to choose the comparison display mode.
-
-    The container includes:
-    - a "Save for Comparison" button,
-    - a "Clear Comparison" button,
-    - a radio control with options "Originals" and "Subtracted" (default "Subtracted") to select how saved comparisons are displayed.
-
+    Builds a container with controls for saving/clearing Speed-to-Fly (STF) comparison data and selecting how comparisons are displayed.
+    
+    The container includes a "Save for Comparison" button, a "Clear Comparison" button, a radio control to choose between showing saved series as "Originals" or "Subtracted", and a metric-selection control.
+    
     Returns:
-        html.Div: A Dash HTML container with the comparison buttons and radio items.
+        html.Div: A Dash HTML container holding the comparison buttons and display-mode controls.
     """
     return html.Div(
         [
@@ -849,35 +915,39 @@ def process_unit_change(
     data,
 ):
     """
-    Process unit changes and update glider parameters based on user input.
-    Handles unit system selection and manages pilot weight/wing loading inputs,
-    converting between different unit systems and calculating derived values.
-    Args:
-        units (str): Selected unit system (e.g., 'Metric', 'US').
-        weight_or_loading (str): User selection between 'Pilot Weight' or 'Wing Loading' input mode.
-        glider_name (str): Name of the selected glider.
-        pilot_weight_in (float): Pilot weight input value in selected units.
-        wing_loading_in (float): Wing loading input value in selected units.
-        v_air_horiz_in (float): Horizontal airmass speed input in selected units.
-        v_air_vert_in (float): Vertical airmass speed input in selected units.
-        data (dict): Stored state data containing pilot_weight, wing_loading, v_air_horiz, v_air_vert.
+    Update UI state and unit-aware values when the unit system, weight input mode, or related inputs change.
+    
+    Convert and synchronize pilot weight, wing loading, and airmass speeds to the selected units; compute derived quantities (gross weight and minimum wing loading); produce display labels, placeholders, and a glider-spec table suitable for the UI; and return updated stored-state payloads.
+    
+    Parameters:
+        units: Selected unit system name (e.g., "Metric" or "US").
+        weight_or_loading: Which input mode is active ("Pilot Weight" or "Wing Loading").
+        glider_name: Selected glider name; defaults to the application's default glider when omitted.
+        pilot_weight_in: User-entered pilot weight in the selected units, or None.
+        wing_loading_in: User-entered wing loading in the selected units, or None.
+        v_air_horiz_in: User-entered horizontal airmass speed in the selected units, or None.
+        v_air_vert_in: User-entered vertical airmass (sink) speed in the selected units, or None.
+        data: Previously stored state dictionary with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
+    
     Returns:
-        tuple: A tuple containing:
-            - glider_data (list): DataFrame records with glider weight and loading specifications.
-            - horizontal_speed_label (str): Label for horizontal speed input field.
-            - vertical_speed_label (str): Label for vertical speed input field.
-            - pilot_weight_label (str): Label for pilot weight input field.
-            - pilot_weight_placeholder (str): Placeholder text for pilot weight input.
-            - pilot_weight_value (float): Current pilot weight value in selected units.
-            - wing_loading_label (str): Label for wing loading input field.
-            - wing_loading_placeholder (str): Placeholder text for wing loading input.
-            - wing_loading_value (float): Current wing loading value in selected units.
-            - min_wing_loading_display (float): Minimum wing loading constraint.
-            - v_air_horiz (float): Horizontal airmass speed in m/s.
-            - v_air_vert (float): Vertical airmass speed in m/s.
-            - data_store (dict): Updated state dictionary with current values.
+        A tuple with the following items, in order:
+        - glider_data (list): Records for the glider info table (labels and Metric/US formatted values).
+        - horizontal_speed_label (str): Label text for the horizontal speed input.
+        - vertical_speed_label (str): Label text for the vertical speed input.
+        - pilot_weight_label (str): Label text for the pilot weight input (includes unit).
+        - pilot_weight_placeholder (str): Placeholder text for the pilot weight input (reference value).
+        - pilot_weight_value (float|None): Pilot weight converted to the selected weight units, rounded to one decimal, or None.
+        - wing_loading_label (str): Label text for the wing loading input (includes unit and minimum).
+        - wing_loading_placeholder (str): Placeholder text for the wing loading input (reference value).
+        - wing_loading_value (float|None): Wing loading converted to the selected pressure units, rounded to one decimal, or None.
+        - min_wing_loading_display (float): Minimum allowable wing loading displayed in the current units.
+        - v_air_horiz (float|None): Horizontal airmass speed converted to the selected speed units, rounded to one decimal, or None.
+        - v_air_vert (float|None): Vertical airmass (sink) speed converted to the selected sink units, rounded to one decimal, or None.
+        - data_store (dict): Minimal stored-state dictionary with raw magnitudes for "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
+        - detailed_store (dict): Internal detailed-store dictionary with working values' magnitudes (pilot_weight, wing_loading, v_air_horiz, v_air_vert).
+    
     Raises:
-        dash.exceptions.PreventUpdate: If no glider is selected or glider info is empty.
+        dash.exceptions.PreventUpdate: If no matching glider information is available for the selected glider.
     """
     logger.info(
         f"process_unit_change called with units={units}, weight_or_loading={weight_or_loading}, glider_name={glider_name}, pilot_weight_in={pilot_weight_in}, wing_loading_in={wing_loading_in}, v_air_horiz_in={v_air_horiz_in}, v_air_vert_in={v_air_vert_in}, data={data}"
@@ -1123,8 +1193,8 @@ def update_graph(
     df_out_data,
 ):
     """
-    Build polar and Speed-to-Fly visualizations, MacCready table data, and manage saved comparison series for the selected glider and current inputs.
-
+    Compute polar and Speed‑to‑Fly figures, generate MacCready table data, and handle saving/clearing of STF comparison series for the selected glider and current inputs.
+    
     Parameters:
         data (dict): Working-state values with keys 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert'. Values are SI magnitudes (e.g., kg, kg/m**2, m/s).
         degree (int|None): Requested polynomial degree for the polar fit; values less than 2 or None use degree 2.
@@ -1140,20 +1210,19 @@ def update_graph(
         units (str): Unit system key (e.g., 'Metric' or 'US') selecting display units for speed, sink, weight, and pressure.
         weight_or_loading (str): Labeling mode for legends/labels; expected values include 'Pilot Weight' or 'Wing Loading'.
         df_out_data (dict|None): Serialized saved STF data previously stored in localStorage (or None).
-
+    
     Returns:
-        tuple: (
-            glider_name_used (str): Glider name used for display,
-            polar_messages (str): Informational/status messages from the polar model,
-            polar_figure (plotly.graph_objs.Figure): Polar plot (speed vs sink) with fits and optional debug traces,
-            stf_figure (plotly.graph_objs.Figure): Speed‑to‑Fly vs MacCready plot including optional saved-comparison traces,
-            mc_table_records (list[dict]): MacCready table rows (fields: MC, STF, Vavg, L/D) with values converted to display units,
-            mc_table_column_defs (list[dict]): AG Grid column definitions for the MacCready table,
-            column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit"),
-            degree_used (int): Effective polynomial degree applied (always >= 2),
-            df_out_disabled_flag (bool): True if there is no saved comparison data (used to disable Clear Comparison),
-            df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data
-        )
+        tuple:
+            glider_name_used (str): Glider name used for display.
+            polar_messages (str): Informational/status messages from the polar model.
+            polar_figure (plotly.graph_objs.Figure): Polar plot (speed vs sink) with fits and optional debug traces.
+            stf_figure (plotly.graph_objs.Figure): Speed‑to‑Fly vs MacCready plot including optional saved-comparison traces.
+            mc_table_records (list[dict]): MacCready table rows (fields: MC, STF, Vavg, L/D) with values converted to display units.
+            mc_table_column_defs (list[dict]): AG Grid column definitions for the MacCready table.
+            column_size_mode (str): Column sizing mode for AG Grid (e.g., "sizeToFit").
+            degree_used (int): Effective polynomial degree applied (always >= 2).
+            df_out_disabled_flag (bool): True if there is no saved comparison data (used to disable Clear Comparison).
+            df_out_data_return (dict|None): Updated serialized saved STF data for localStorage, or None if no saved data.
     """
     # Load df_out from store or initialize to None
     # Rehydrate PintArray columns with units
