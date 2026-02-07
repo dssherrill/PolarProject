@@ -61,13 +61,19 @@ class Polar:
             else current_glider.reference_weight()
         )
 
-        self.__messages = ""
+        # Initialize fit_results before weight-factor computation
+        self.__fit_results = {
+            "R value": None,
+            "MSE": None,
+            "Coefficients": None,
+            "Messages": "",
+        }
 
         # Weight factor used to scale the polar sink rates
         if current_glider.reference_weight() == 0:
             msg = "Reference weight is zero; forcing weight factor to 1.0"
             logger.error(msg)
-            self.__messages += msg + "\n"
+            self.__fit_results["Messages"] += msg + "\n"
             self.__weight_factor = 1.0
         else:
             ratio = (
@@ -77,6 +83,9 @@ class Polar:
 
         self.fit_polar(degree)
 
+    def fit_results(self):
+        return self.__fit_results
+
     def messages(self):
         """
         Get accumulated status and error messages for this Polar instance.
@@ -84,7 +93,7 @@ class Polar:
         Returns:
             str: Concatenated message string collected during operations; empty string if no messages.
         """
-        return self.__messages
+        return self.__fit_results["Messages"]
 
     # def get_reference_pilot_weight(self):
     #     return self.__ref_weight - self.__empty_weight
@@ -255,11 +264,20 @@ class Polar:
             f"Fitting polar of degree {degree} over speed range {self.speed_range[0]:.3f} to {self.speed_range[1]:.3f} m/s"
         )
 
+        # Warn if polynomial degree is unusually high (typically 3-5 is optimal for glider polars)
+        if degree > 6:
+            warning_msg = f"⚠️ Warning: Polynomial degree {degree} is very high; this may cause overfitting and solver instability. Degrees 3-5 are typically recommended for glider polar data.\n"
+            logger.warning(warning_msg.strip())
+            self.__fit_results["Messages"] += warning_msg + "\n"
+
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
         if degree <= 3:
             min_sink_index = np.argmax(sink)
             start_index = min_sink_index
+            self.__fit_results[
+                "Messages"
+            ] += f"⚠️ Notice: Polar data below minimum sink speed ({speed[min_sink_index]:.3f} m/s) excluded from fit.\nThis low-order model (degree={degree}) cannot follow the curvature near stall speed.\n"
         else:
             start_index = 0
 
@@ -283,8 +301,6 @@ class Polar:
             sink[start_index:], sink_predicted[start_index:]
         )
 
-        self.__messages += f"R<sup>2</sup> = {r_value**2:.5}\n"
-
         # Compute mean squared error (defensively extract SSE)
         n_data_points = len(speed) - start_index
         if isinstance(SSE, (list, tuple, np.ndarray)) and len(SSE) > 0:
@@ -296,9 +312,12 @@ class Polar:
                 SSE_val = 0.0
 
         MSE = SSE_val / n_data_points
-        self.__messages += f"MSE = {MSE:.3}\n"
 
-        logger.info(f"{self.__messages}")
+        self.__fit_results["R value"] = r_value
+        self.__fit_results["Coefficients"] = self.__sink_poly.convert().coef
+        self.__fit_results["MSE"] = MSE
+
+        logger.info(f"{self.__fit_results['Messages']}")
 
     def normal_solver(self, initial_guess, mc):
         """
@@ -311,7 +330,7 @@ class Polar:
         Returns:
             Root speed in meters per second if a root is found, `None` otherwise.
         """
-        [sol, _, err, _msg] = fsolve(
+        [sol, _, err, msg] = fsolve(
             self.goal_function, initial_guess, (mc), full_output=True, xtol=1.0e-6
         )
         if err == 1:
@@ -319,6 +338,7 @@ class Polar:
         else:
             # fsolve did not find a solution
             solution = None
+            logger.debug(msg)
 
         return solution
 
@@ -341,9 +361,9 @@ class Polar:
         if r0_val * r1_val > 0:
             # goal function has same sign at both ends of range
             # Brute force search for a better range
-            # logger.debug(
-            #     f"Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})"
-            # )
+            logger.debug(
+                f"Initial failure: ({working_range[0]:.2f}, {working_range[1]:.2f}) = ({r0_val:.6f}, {r1_val:.6f})"
+            )
             r0 = working_range[0]
             for r1 in np.arange(working_range[0], 1.5 * working_range[1], 5.0):
                 r1_val = self.goal_function(r1, mc)
@@ -357,7 +377,6 @@ class Polar:
                 r0_val = r1_val
 
         if r0_val * r1_val > 0:
-            # self.__messages += f"\nNo sign change in goal function for MC = {mc:.3f} m/s over range {search_range[0]:0.2f} to {search_range[1]:0.2f} m/s\n"
             solution = None
         else:
             # bruteforce solver
@@ -435,7 +454,9 @@ class Polar:
                 Vavg[i] = float("nan")
                 LD[i] = float("nan")
                 solver_result[i] = float("nan")
-                self.__messages += f"No solution found for MC = {mc:.3f~P}\n"
+                self.__fit_results[
+                    "Messages"
+                ] += f"No solution found for MC = {mc:.3f~P}\n"
                 logger.debug(f"No solution found for MC={mc:.3f~P}")
             else:
                 Vstf[i] = v

@@ -382,7 +382,7 @@ def add_polynomial_statistics():
                                     dbc.Col(
                                         [
                                             dcc.Markdown(
-                                                "Statistics",
+                                                "Waiting...",
                                                 style={
                                                     "whiteSpace": "pre-line",
                                                     # "fontFamily": "Courier, serif",
@@ -390,7 +390,7 @@ def add_polynomial_statistics():
                                                 id="statistics",
                                                 mathjax=True,  # Enable LaTeX rendering
                                                 dangerously_allow_html=True,
-                                                className="text-start",
+                                                # className="text-start",
                                             ),  # enable html display without purify
                                         ]
                                     )
@@ -1225,7 +1225,7 @@ def determine_title_from_figure(figure, compare_metric):
             # Unknown type, assume visible
             visible = True
 
-        if visible == False or visible == "legendonly":
+        if visible is False or visible == "legendonly":
             continue
 
         # Get trace name - handle both attribute and dict access
@@ -1247,7 +1247,7 @@ def determine_title_from_figure(figure, compare_metric):
             # Comparison traces show the metric selected by compare_metric
             if compare_metric == "STF":
                 stf_type_visible = True
-            else:  # compare_metric == 'Vavg'
+            else:  # compare_metric == "Vavg"
                 vavg_type_visible = True
 
     # Use the existing helper to determine the title
@@ -1650,14 +1650,26 @@ def update_graph(
     # Evaluate the polynomial for new points
     # Expand the speed range to show extrapolation used in STF calculation, if any.
     polar_speed_range = current_polar.speed_range
-    stf_speed_range = (
-        min(df_mc_graph["STF"]).magnitude,
-        max(df_mc_graph["STF"]).magnitude,
-    )
-    graph_range = (
-        min(polar_speed_range[0], stf_speed_range[0]),
-        max(polar_speed_range[1], stf_speed_range[1]),
-    )
+
+    # Check if STF column contains any valid (non-NA/non-NaN) values
+    stf_valid = df_mc_graph["STF"].dropna()
+    if len(stf_valid) > 0:
+        # If we have valid STF values, include them in the graph range
+        stf_speed_range = (
+            min(stf_valid).magnitude,
+            max(stf_valid).magnitude,
+        )
+        graph_range = (
+            min(polar_speed_range[0], stf_speed_range[0]),
+            max(polar_speed_range[1], stf_speed_range[1]),
+        )
+    else:
+        # If all STF values are NA/NaN (solver failed for all MC values),
+        # use only the polar speed range
+        logger.warning(
+            "All STF values are NA/NaN; using only polar speed range for graph"
+        )
+        graph_range = polar_speed_range
 
     # Make the speed points at 0.5 m/s intervals
     speed_mps_magnitude = np.arange(
@@ -1764,10 +1776,42 @@ def update_graph(
     else:
         df_out_data_return = None
 
+    # Build a Latex string with the polynomial results, including the full polynomial equation with all the coefficients.
+    results = current_polar.fit_results()
+    logger.debug(f"Fit results: {results}")
+
+    # Validate that fit_results returned valid data
+    if (
+        results is None
+        or results.get("R value") is None
+        or results.get("MSE") is None
+        or results.get("Coefficients") is None
+        or not hasattr(results["Coefficients"], "__getitem__")
+    ):
+        logger.error(
+            "Polynomial fit results are incomplete or invalid; cannot format LaTeX output"
+        )
+        latex_out = "**Error**: Polynomial fit failed. Cannot display results.\n\n"
+        if results and results.get("Messages"):
+            latex_out += results.get("Messages") or ""
+    else:
+        # Safe to format latex_out using results and c = results["Coefficients"]
+        c = results["Coefficients"]
+        logger.debug(f"Polynomial coefficients: {c}")
+
+        latex_out = f"$R^2=$ {(results['R value']**2):.4g}\n"
+        latex_out += f"$MSE=$ {results['MSE']:.4g}\n"
+        latex_out += f"\n\n$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
+        for i in range(2, len(c)):
+            latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
+
+        latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
+        latex_out += results["Messages"]
+
     logger.debug("update_graph return\n")
     return (
         "",  # glider_name,
-        current_polar.messages(),
+        latex_out,
         polar_graph,
         stf_graph,
         df_mc_table.to_dict("records"),
@@ -1808,6 +1852,7 @@ def update_stf_title_on_restyle(restyle_data, current_figure, compare_metric):
     Returns:
         dict: Updated figure with appropriate title
     """
+
     if not restyle_data or not current_figure:
         raise dash.exceptions.PreventUpdate
 
