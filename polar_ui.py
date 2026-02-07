@@ -38,7 +38,7 @@ logger.debug(f"Logging configured with level: {log_level_name}")
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize a filename by removing invalid filesystem characters.
+    r"""Sanitize a filename by removing invalid filesystem characters.
 
     Removes or replaces characters that are invalid in Windows/Unix filenames:
     / \ : * ? " < > |
