@@ -61,6 +61,14 @@ class Polar:
             else current_glider.reference_weight()
         )
 
+        # Initialize fit_results before weight-factor computation
+        self.__fit_results = {
+            "R value": None,
+            "MSE": None,
+            "Coefficients": None,
+            "Messages": "",
+        }
+
         # Weight factor used to scale the polar sink rates
         if current_glider.reference_weight() == 0:
             msg = "Reference weight is zero; forcing weight factor to 1.0"
@@ -73,12 +81,6 @@ class Polar:
             ).to_base_units()
             self.__weight_factor = np.sqrt(ratio.magnitude)
 
-        self.__fit_results = {
-            "R value": None,
-            "MSE": None,
-            "Coefficients": None,
-            "Messages": "",
-        }
         self.fit_polar(degree)
 
     def fit_results(self):
@@ -262,11 +264,20 @@ class Polar:
             f"Fitting polar of degree {degree} over speed range {self.speed_range[0]:.3f} to {self.speed_range[1]:.3f} m/s"
         )
 
+        # Warn if polynomial degree is unusually high (typically 3-5 is optimal for glider polars)
+        if degree > 6:
+            warning_msg = f"⚠️ Warning: Polynomial degree {degree} is very high; this may cause overfitting and solver instability. Degrees 3-5 are typically recommended for glider polar data.\n"
+            logger.warning(warning_msg.strip())
+            self.__fit_results["Messages"] += warning_msg + "\n"
+
         # Low-order fits should ignore polar data at speeds below minimum sink
         # because the model cannot follow the curvature near stall speed
         if degree <= 3:
             min_sink_index = np.argmax(sink)
             start_index = min_sink_index
+            self.__fit_results[
+                "Messages"
+            ] += f"⚠️ Notice: Polar data below minimum sink speed ({speed[min_sink_index]:.3f} m/s) excluded from fit.\nThis low-order model (degree={degree}) cannot follow the curvature near stall speed.\n"
         else:
             start_index = 0
 
@@ -327,7 +338,7 @@ class Polar:
         else:
             # fsolve did not find a solution
             solution = None
-            self.__fit_results["Messages"] += msg
+            logger.debug(msg)
 
         return solution
 

@@ -1644,14 +1644,26 @@ def update_graph(
     # Evaluate the polynomial for new points
     # Expand the speed range to show extrapolation used in STF calculation, if any.
     polar_speed_range = current_polar.speed_range
-    stf_speed_range = (
-        min(df_mc_graph["STF"]).magnitude,
-        max(df_mc_graph["STF"]).magnitude,
-    )
-    graph_range = (
-        min(polar_speed_range[0], stf_speed_range[0]),
-        max(polar_speed_range[1], stf_speed_range[1]),
-    )
+
+    # Check if STF column contains any valid (non-NA/non-NaN) values
+    stf_valid = df_mc_graph["STF"].dropna()
+    if len(stf_valid) > 0:
+        # If we have valid STF values, include them in the graph range
+        stf_speed_range = (
+            min(stf_valid).magnitude,
+            max(stf_valid).magnitude,
+        )
+        graph_range = (
+            min(polar_speed_range[0], stf_speed_range[0]),
+            max(polar_speed_range[1], stf_speed_range[1]),
+        )
+    else:
+        # If all STF values are NA/NaN (solver failed for all MC values),
+        # use only the polar speed range
+        logger.warning(
+            "All STF values are NA/NaN; using only polar speed range for graph"
+        )
+        graph_range = polar_speed_range
 
     # Make the speed points at 0.5 m/s intervals
     speed_mps_magnitude = np.arange(
@@ -1760,19 +1772,35 @@ def update_graph(
 
     # Build a Latex string with the polynomial results, including the full polynomial equation with all the coefficients.
     results = current_polar.fit_results()
-    latex_out = f"$R^2=$ {(results['R value']**2):.4g}\n"
     logger.debug(f"Fit results: {results}")
 
-    latex_out += f"$MSE=$ {results['MSE']:.4g}\n"
+    # Validate that fit_results returned valid data
+    if (
+        results is None
+        or results.get("R value") is None
+        or results.get("MSE") is None
+        or results.get("Coefficients") is None
+        or not hasattr(results["Coefficients"], "__getitem__")
+    ):
+        logger.error(
+            "Polynomial fit results are incomplete or invalid; cannot format LaTeX output"
+        )
+        latex_out = "**Error**: Polynomial fit failed. Cannot display results.\n\n"
+        if results and results.get("Messages"):
+            latex_out += results["Messages"]
+    else:
+        # Safe to format latex_out using results and c = results["Coefficients"]
+        c = results["Coefficients"]
+        logger.debug(f"Polynomial coefficients: {c}")
 
-    c = results["Coefficients"]
-    logger.debug(f"Polynomial coefficients: {c}")
-    latex_out += f"\n\n$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
-    for i in range(2, len(c)):
-        latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
+        latex_out = f"$R^2=$ {(results['R value']**2):.4g}\n"
+        latex_out += f"$MSE=$ {results['MSE']:.4g}\n"
+        latex_out += f"\n\n$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
+        for i in range(2, len(c)):
+            latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
 
-    latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
-    latex_out += results["Messages"]
+        latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
+        latex_out += results["Messages"]
 
     logger.debug("update_graph return\n")
     return (
