@@ -1854,7 +1854,9 @@ def update_stf_title_on_restyle(restyle_data, current_figure, compare_metric):
         updated_title["subtitle"] = current_title["subtitle"]
 
     # Update the figure's title
-    current_figure["layout"]["title"] = updated_title
+    layout = current_figure.get("layout") or {}
+    layout["title"] = updated_title
+    current_figure["layout"] = layout
 
     return current_figure
 
