@@ -1149,6 +1149,28 @@ def process_unit_change(
     )
 
 
+def determine_stf_graph_title(stf_visible, vavg_visible):
+    """
+    Determine the appropriate title for the STF graph based on trace visibility.
+    
+    Parameters:
+        stf_visible (bool): Whether the STF trace is visible
+        vavg_visible (bool): Whether the V_avg trace is visible
+    
+    Returns:
+        str: The appropriate title text
+    """
+    if stf_visible and vavg_visible:
+        return "MacCready Speed-to-Fly and Average Speed"
+    elif stf_visible:
+        return "MacCready Speed-to-Fly"
+    elif vavg_visible:
+        return "Average Speed"
+    else:
+        # Both hidden - default to full title
+        return "MacCready Speed-to-Fly and Average Speed"
+
+
 ##################################################################
 @callback(
     Output(component_id="main-title", component_property="children"),
@@ -1457,8 +1479,13 @@ def update_graph(
             secondary_y=True,
         )
 
+    # Determine initial title based on trace visibility
+    # Both STF and Vavg traces have the same initial visibility
+    stf_visible = not subtract_active
+    vavg_visible = not subtract_active
+    
     stf_graph_title = {
-        "text": "MacCready Speed-to-Fly and Average Speed",
+        "text": determine_stf_graph_title(stf_visible, vavg_visible),
         "y": 0.9,
         "x": 0.5,
         "xanchor": "center",
@@ -1672,6 +1699,109 @@ def update_graph(
         ),  # disable the "Clear Comparison" button if there is no data saved
         df_out_data_return,
     )
+
+
+##################################################################
+# Callback to update graph title based on trace visibility
+@callback(
+    Output(component_id="graph-stf", component_property="figure", allow_duplicate=True),
+    Input(component_id="graph-stf", component_property="restyleData"),
+    State(component_id="graph-stf", component_property="figure"),
+    prevent_initial_call=True,
+)
+def update_stf_title_on_restyle(restyle_data, current_figure):
+    """
+    Update the STF graph title when user toggles trace visibility via legend.
+    
+    This callback responds to restyleData changes (e.g., clicking legend items)
+    and updates the graph title to reflect which traces are currently visible.
+    Preserves any existing subtitle.
+    
+    Parameters:
+        restyle_data (list): Plotly restyleData containing visibility changes
+        current_figure (dict): Current state of the STF graph figure
+    
+    Returns:
+        dict: Updated figure with appropriate title
+    """
+    if not restyle_data or not current_figure:
+        raise dash.exceptions.PreventUpdate
+    
+    # restyleData format: [{'visible': [True/False/'legendonly']}, [trace_indices]]
+    changes = restyle_data[0]
+    trace_indices = restyle_data[1] if len(restyle_data) > 1 else None
+    
+    # If no visibility changes, don't update
+    if 'visible' not in changes:
+        raise dash.exceptions.PreventUpdate
+    
+    # Get the current traces from the figure
+    traces = current_figure.get('data', [])
+    if not traces:
+        raise dash.exceptions.PreventUpdate
+    
+    # Determine which traces are the main STF and Vavg traces
+    # They are the first two traces added, with names "STF" and "V<sub>avg</sub>"
+    stf_trace_idx = None
+    vavg_trace_idx = None
+    
+    for idx, trace in enumerate(traces):
+        if trace.get('name') == 'STF':
+            stf_trace_idx = idx
+        elif trace.get('name') == 'V<sub>avg</sub>':
+            vavg_trace_idx = idx
+    
+    # If we can't find both main traces, don't update
+    if stf_trace_idx is None or vavg_trace_idx is None:
+        raise dash.exceptions.PreventUpdate
+    
+    # Determine visibility for each main trace
+    # If trace_indices is specified, only those traces were changed
+    # Otherwise, all traces were changed
+    
+    def is_trace_visible(trace_idx):
+        """Check if a trace is currently visible"""
+        # Check if this trace was just changed
+        if trace_indices is not None and trace_idx in trace_indices:
+            # Get the new visibility from changes
+            idx_in_changes = trace_indices.index(trace_idx)
+            visibility = changes['visible']
+            if isinstance(visibility, list):
+                new_vis = visibility[idx_in_changes]
+            else:
+                new_vis = visibility
+            return new_vis is True or new_vis == True
+        else:
+            # Use current visibility from figure
+            current_vis = traces[trace_idx].get('visible', True)
+            return current_vis is True or current_vis == True
+    
+    stf_visible = is_trace_visible(stf_trace_idx)
+    vavg_visible = is_trace_visible(vavg_trace_idx)
+    
+    # Determine the new title
+    new_title_text = determine_stf_graph_title(stf_visible, vavg_visible)
+    
+    # Get current title structure to preserve subtitle
+    current_title = current_figure.get('layout', {}).get('title', {})
+    
+    # Create updated title, preserving subtitle if it exists
+    updated_title = {
+        "text": new_title_text,
+        "y": current_title.get('y', 0.9),
+        "x": current_title.get('x', 0.5),
+        "xanchor": current_title.get('xanchor', 'center'),
+        "yanchor": current_title.get('yanchor', 'top'),
+    }
+    
+    # Preserve subtitle if it exists
+    if 'subtitle' in current_title:
+        updated_title['subtitle'] = current_title['subtitle']
+    
+    # Update the figure's title
+    current_figure['layout']['title'] = updated_title
+    
+    return current_figure
 
 
 ##################################################################

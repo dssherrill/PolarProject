@@ -16,11 +16,13 @@ import numpy as np
 from unittest.mock import patch, MagicMock, Mock
 import tempfile
 import os
+import dash.exceptions
 
 import polar_ui
 import glider
 import polar_calc
 from units import ureg
+
 
 
 @pytest.fixture
@@ -772,3 +774,149 @@ class TestDashApp:
         """Test that default polynomial degree is defined"""
         assert hasattr(polar_ui, "DEFAULT_POLYNOMIAL_DEGREE")
         assert polar_ui.DEFAULT_POLYNOMIAL_DEGREE == 5
+
+
+class TestSTFGraphTitle:
+    """Test cases for STF graph title determination"""
+
+    def test_determine_stf_graph_title_both_visible(self):
+        """Test title when both STF and Vavg are visible"""
+        title = polar_ui.determine_stf_graph_title(True, True)
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
+    def test_determine_stf_graph_title_stf_only(self):
+        """Test title when only STF is visible"""
+        title = polar_ui.determine_stf_graph_title(True, False)
+        assert title == "MacCready Speed-to-Fly"
+
+    def test_determine_stf_graph_title_vavg_only(self):
+        """Test title when only Vavg is visible"""
+        title = polar_ui.determine_stf_graph_title(False, True)
+        assert title == "Average Speed"
+
+    def test_determine_stf_graph_title_both_hidden(self):
+        """Test title when both are hidden (default case)"""
+        title = polar_ui.determine_stf_graph_title(False, False)
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
+
+class TestUpdateSTFTitleCallback:
+    """Test cases for update_stf_title_on_restyle callback"""
+
+    def test_update_stf_title_on_restyle_no_data(self):
+        """Test that callback prevents update when no data"""
+        with pytest.raises(dash.exceptions.PreventUpdate):
+            polar_ui.update_stf_title_on_restyle(None, None)
+
+    def test_update_stf_title_on_restyle_no_visibility_change(self):
+        """Test that callback prevents update when no visibility changes"""
+        restyle_data = [{"line": {"width": 3}}, [0]]
+        figure = {"data": [{"name": "STF", "visible": True}]}
+        
+        with pytest.raises(dash.exceptions.PreventUpdate):
+            polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+
+    def test_update_stf_title_on_restyle_hide_stf(self):
+        """Test hiding STF trace updates title to 'Average Speed'"""
+        restyle_data = [{"visible": [False]}, [0]]
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ],
+            "layout": {
+                "title": {
+                    "text": "MacCready Speed-to-Fly and Average Speed",
+                    "y": 0.9,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                }
+            },
+        }
+        
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        assert result["layout"]["title"]["text"] == "Average Speed"
+
+    def test_update_stf_title_on_restyle_hide_vavg(self):
+        """Test hiding Vavg trace updates title to 'MacCready Speed-to-Fly'"""
+        restyle_data = [{"visible": [False]}, [1]]
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ],
+            "layout": {
+                "title": {
+                    "text": "MacCready Speed-to-Fly and Average Speed",
+                    "y": 0.9,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                }
+            },
+        }
+        
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly"
+
+    def test_update_stf_title_on_restyle_show_both(self):
+        """Test showing both traces updates title correctly"""
+        restyle_data = [{"visible": [True, True]}, [0, 1]]
+        figure = {
+            "data": [
+                {"name": "STF", "visible": False},
+                {"name": "V<sub>avg</sub>", "visible": False},
+            ],
+            "layout": {
+                "title": {
+                    "text": "Average Speed",
+                    "y": 0.9,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                }
+            },
+        }
+        
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly and Average Speed"
+
+    def test_update_stf_title_preserves_subtitle(self):
+        """Test that subtitle is preserved when updating title"""
+        restyle_data = [{"visible": [False]}, [0]]
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ],
+            "layout": {
+                "title": {
+                    "text": "MacCready Speed-to-Fly and Average Speed",
+                    "subtitle": {"text": "Subtracting Test Config"},
+                    "y": 0.9,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                }
+            },
+        }
+        
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        assert result["layout"]["title"]["text"] == "Average Speed"
+        assert result["layout"]["title"]["subtitle"]["text"] == "Subtracting Test Config"
+
+    def test_update_stf_title_missing_traces(self):
+        """Test that callback prevents update when main traces not found"""
+        restyle_data = [{"visible": [False]}, [0]]
+        figure = {
+            "data": [
+                {"name": "OtherTrace", "visible": True},
+            ],
+            "layout": {
+                "title": {"text": "Some Title"}
+            },
+        }
+        
+        with pytest.raises(dash.exceptions.PreventUpdate):
+            polar_ui.update_stf_title_on_restyle(restyle_data, figure)
