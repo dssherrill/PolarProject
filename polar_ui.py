@@ -1183,16 +1183,23 @@ def determine_title_from_figure(figure, compare_metric):
       based on the compare_metric setting
     
     Parameters:
-        figure (dict): The Plotly figure object with traces
+        figure (dict or Figure): The Plotly figure object with traces
         compare_metric (str): Either "STF" or "Vavg" - determines what comparison traces show
     
     Returns:
         str: The appropriate title text
     """
-    if not figure or 'data' not in figure:
+    if not figure:
         return "MacCready Speed-to-Fly and Average Speed"
     
-    traces = figure['data']
+    # Handle both Plotly Figure objects and dictionary representations
+    if hasattr(figure, 'data'):
+        traces = figure.data
+    elif 'data' in figure:
+        traces = figure['data']
+    else:
+        return "MacCready Speed-to-Fly and Average Speed"
+    
     if not traces:
         return "MacCready Speed-to-Fly and Average Speed"
     
@@ -1201,12 +1208,27 @@ def determine_title_from_figure(figure, compare_metric):
     vavg_type_visible = False
     
     for trace in traces:
-        # Check if trace is visible
-        visible = trace.get('visible', True)
+        # Check if trace is visible - handle both attribute and dict access
+        if hasattr(trace, 'visible'):
+            # Plotly trace object
+            visible = trace.visible
+        elif isinstance(trace, dict):
+            # Dictionary representation
+            visible = trace.get('visible', True)
+        else:
+            # Unknown type, assume visible
+            visible = True
+            
         if visible == False or visible == 'legendonly':
             continue
         
-        trace_name = trace.get('name', '')
+        # Get trace name - handle both attribute and dict access
+        if hasattr(trace, 'name'):
+            trace_name = trace.name
+        elif isinstance(trace, dict):
+            trace_name = trace.get('name', '')
+        else:
+            trace_name = ''
         
         # Main STF trace
         if trace_name == 'STF':

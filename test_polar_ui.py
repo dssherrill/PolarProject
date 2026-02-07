@@ -927,6 +927,30 @@ class TestDetermineTitleFromFigure:
         title = polar_ui.determine_title_from_figure(figure, "STF")
         assert title == "MacCready Speed-to-Fly"
 
+    def test_plotly_figure_object(self):
+        """Test with actual Plotly Figure object (not dictionary)"""
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        
+        # Create real Plotly figure
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        
+        # Add traces as Plotly objects
+        trace_stf = go.Scatter(x=[1, 2], y=[1, 2], name="STF", visible=True)
+        fig.add_trace(trace_stf, secondary_y=False)
+        
+        trace_vavg = go.Scatter(x=[1, 2], y=[2, 3], name="V<sub>avg</sub>", visible=False)
+        fig.add_trace(trace_vavg, secondary_y=False)
+        
+        # Test with Plotly Figure object
+        title = polar_ui.determine_title_from_figure(fig, "STF")
+        assert title == "MacCready Speed-to-Fly"
+        
+        # Test with both visible
+        fig.data[1].visible = True
+        title = polar_ui.determine_title_from_figure(fig, "STF")
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
 
 class TestUpdateSTFTitleCallback:
     """Test cases for update_stf_title_on_restyle callback"""
