@@ -197,9 +197,9 @@ full_width_class = "d-flex w-100 justify-content-left bg-light"  # p-3"
 def add_weight_choice():
     """
     Render the weight selection card used to choose between pilot weight and wing loading.
-    
+
     The card includes a radio control to select either "Pilot Weight" or "Wing Loading", the corresponding numeric input (only one is shown at a time), and the polynomial degree control.
-    
+
     Returns:
         html.Div: A Dash container representing the weight choice card with radio selector, pilot-weight and wing-loading inputs, and an embedded polynomial degree input.
     """
@@ -217,7 +217,7 @@ def add_weight_choice():
                                                 "Select:",
                                                 html_for="radio-weight-or-loading",
                                                 id="input-choice-prompt",
-                                                className="text-primary fs-5",
+                                                className="text-primary fs-5 ms-3",
                                             ),
                                             dbc.RadioItems(
                                                 options=[
@@ -249,23 +249,26 @@ def add_weight_choice():
                                                                         debounce=0.75,
                                                                         persistence=True,
                                                                         persistence_type="local",
-                                                                        className="ms-3 mt-6",
+                                                                        className="mt-3 ms-3",
                                                                     ),
                                                                     html.Br(),
                                                                     dbc.Label(
                                                                         "Pilot + Ballast weight (kg):",
                                                                         html_for="pilot-weight-input",
                                                                         id="pilot-weight-label",
-                                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                                        className="ms-3",
                                                                     ),
                                                                 ],
-                                                                className="w-100 mt-auto",
+                                                                className="mt-auto",
                                                             ),
                                                         ],
                                                     ),
                                                 ],
-                                                style={"text-align": "right"},
-                                                className="mt-6",
+                                                style={
+                                                    "text-align": "center",
+                                                    "flex": "1 1 250px",
+                                                },
+                                                className="mt-1",
                                                 id="pilot-weight-row",
                                             ),
                                             html.Div(
@@ -278,23 +281,26 @@ def add_weight_choice():
                                                         debounce=0.75,
                                                         persistence=True,
                                                         persistence_type="local",
-                                                        className="ms-3 mt-6",
+                                                        className="mt-3 ms-3",
                                                     ),
                                                     html.Br(),
                                                     dbc.Label(
                                                         "Wing Loading (kg/m²)",
                                                         html_for="wing-loading-input",
                                                         id="wing-loading-label",
-                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                        className="ms-3",
                                                     ),
                                                 ],
-                                                style={"text-align": "right"},
-                                                className="mt-6",
+                                                style={
+                                                    "text-align": "center",
+                                                    "flex": "1 1 250px",
+                                                },
+                                                className="mt-3",
                                                 id="wing-loading-row",
                                             ),
                                         ],
                                         direction="horizontal",
-                                        className="w-100 hstack gap-3 m-3",
+                                        className="hstack flex-wrap",
                                     ),
                                 ],
                                 width=True,
@@ -309,23 +315,23 @@ def add_weight_choice():
                                         add_polynomial_degree(),
                                     ]
                                 ),
-                                className="m-3 mt-auto",
+                                className="mt-auto",
                                 width=True,
                             ),
                         ],
                     ),
                 ],
-                className="border-primary mt-3 w-100",
+                className="flex-wrap border-primary mt-3 mb-3",
             ),
         ],
-        className="w-100",
+        className="flex-wrap",
     )
 
 
 def add_polynomial_degree():
     """
     Create a labeled numeric input control for selecting the polynomial fit degree.
-    
+
     Returns:
         html.Div: A container with a "Polynomial degree" label and a numeric input (min 2) whose placeholder shows the default degree.
     """
@@ -346,7 +352,7 @@ def add_polynomial_degree():
                 debounce=0.75,
             ),
         ],
-        className="w-100",
+        className="mb-3 ms-3",
     )
 
 
@@ -393,7 +399,7 @@ def add_polynomial_statistics():
                         ],
                     ),
                 ],
-                className="border-primary mt-3 w-100",
+                className="border-primary mt-2 w-100",
             )
         ],
         className="w-100",
@@ -403,10 +409,10 @@ def add_polynomial_statistics():
 def add_graph(graph_id):
     """
     Create a Dash Graph container with the given component id.
-    
+
     Parameters:
         graph_id (str): The id to assign to the contained dcc.Graph component.
-    
+
     Returns:
         html.Div: A Div wrapping a dcc.Graph configured with the provided id.
     """
@@ -418,7 +424,7 @@ def add_graph(graph_id):
 def add_mc_aggrid():
     """
     Builds the AG Grid container used to display the MacCready table.
-    
+
     Returns:
         html.Div: A Div containing an AgGrid configured for automatic height and full width with id "mcAgGrid".
     """
@@ -437,9 +443,9 @@ def add_mc_aggrid():
 def add_subtract_choice():
     """
     Build a labeled radio control used to toggle between showing original comparison series or their subtracted differences.
-    
+
     The control contains a label "Show:" and a RadioItems component with options "Originals" and "Subtracted", defaulting to "Originals" and persisted locally.
-    
+
     Returns:
         html.Div: A Dash container holding the label and the radio selection (id "radio-subtract-compare").
     """
@@ -465,10 +471,10 @@ def add_subtract_choice():
 def add_card_stack(html_text):
     """
     Wrap the provided content in a horizontal card stack inside a Div.
-    
+
     Parameters:
         html_text: Dash/HTML component or string to be placed inside the card body.
-    
+
     Returns:
         A dash_html_components.Div containing a horizontal stack with a single primary-bordered Card that holds the provided content.
     """
@@ -493,7 +499,7 @@ def add_card_stack(html_text):
 def add_compare_buttons():
     """
     Create a horizontal pair of comparison control buttons.
-    
+
     Returns:
         dbc.Stack: A horizontal Bootstrap stack containing two buttons:
             - "Save for Comparison" with id "save-comparison-button".
@@ -525,9 +531,9 @@ def add_compare_buttons():
 def add_units_selection():
     """
     Create a card containing a labeled radio control for selecting the unit system.
-    
+
     The control offers "Metric" and "US" options, defaults to "Metric", and persists the user's choice to local storage.
-    
+
     Returns:
         html.Div: A Dash HTML container wrapping a Bootstrap Card with the labeled RadioItems control (id="radio-units").
     """
@@ -554,7 +560,7 @@ def add_units_selection():
                     direction="horizontal",
                     className="hstack m-3",  # gap-3 m-3 align-items-start",
                 ),
-                className="border-primary mt-3 w-100",
+                className="border-primary mb-2",
             ),
         ],
     )
@@ -563,10 +569,10 @@ def add_units_selection():
 def add_metric_choice():
     """
     Create a control for selecting the comparison metric shown in the UI.
-    
+
     The control presents a labeled radio group with two choices: "Speed-to-Fly" and "Average Speed".
     The radio items persist their selection locally and default to "STF".
-    
+
     Returns:
         html.Div: A Dash container holding the label and radio items; the radio value is `"STF"` or `"Vavg"`.
     """
@@ -595,9 +601,9 @@ def add_metric_choice():
 def add_compare_controls():
     """
     Builds a container with controls for saving/clearing Speed-to-Fly (STF) comparison data and selecting how comparisons are displayed.
-    
+
     The container includes a "Save for Comparison" button, a "Clear Comparison" button, a radio control to choose between showing saved series as "Originals" or "Subtracted", and a metric-selection control.
-    
+
     Returns:
         html.Div: A Dash HTML container holding the comparison buttons and display-mode controls.
     """
@@ -725,7 +731,7 @@ app.layout = dbc.Container(
                         add_graph("graph-polar"),
                     ],
                     md=4,
-                    className="mt-auto m-1",  # border-primary",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # border-primary",  # force content to the bottom of the column
                     style={
                         "border": "2px solid #ccc",
                         "padding": "10px",
@@ -738,7 +744,7 @@ app.layout = dbc.Container(
                         add_graph("graph-stf"),
                     ],
                     md=4,
-                    className="mt-auto m-1",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # force content to the bottom of the column
                     style={
                         "border": "2px solid #ccc",
                         "padding": "10px",
@@ -748,7 +754,7 @@ app.layout = dbc.Container(
                 dbc.Col(
                     add_mc_aggrid(),
                     md=3,
-                    className="mt-auto",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # force content to the bottom of the column
                 ),
             ],
             className=full_width_class,
@@ -916,9 +922,9 @@ def process_unit_change(
 ):
     """
     Update UI state and unit-aware values when the unit system, weight input mode, or related inputs change.
-    
+
     Convert and synchronize pilot weight, wing loading, and airmass speeds to the selected units; compute derived quantities (gross weight and minimum wing loading); produce display labels, placeholders, and a glider-spec table suitable for the UI; and return updated stored-state payloads.
-    
+
     Parameters:
         units: Selected unit system name (e.g., "Metric" or "US").
         weight_or_loading: Which input mode is active ("Pilot Weight" or "Wing Loading").
@@ -928,7 +934,7 @@ def process_unit_change(
         v_air_horiz_in: User-entered horizontal airmass speed in the selected units, or None.
         v_air_vert_in: User-entered vertical airmass (sink) speed in the selected units, or None.
         data: Previously stored state dictionary with keys "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
-    
+
     Returns:
         A tuple with the following items, in order:
         - glider_data (list): Records for the glider info table (labels and Metric/US formatted values).
@@ -945,7 +951,7 @@ def process_unit_change(
         - v_air_vert (float|None): Vertical airmass (sink) speed converted to the selected sink units, rounded to one decimal, or None.
         - data_store (dict): Minimal stored-state dictionary with raw magnitudes for "pilot_weight", "wing_loading", "v_air_horiz", "v_air_vert".
         - detailed_store (dict): Internal detailed-store dictionary with working values' magnitudes (pilot_weight, wing_loading, v_air_horiz, v_air_vert).
-    
+
     Raises:
         dash.exceptions.PreventUpdate: If no matching glider information is available for the selected glider.
     """
@@ -1152,11 +1158,11 @@ def process_unit_change(
 def determine_stf_graph_title(stf_visible, vavg_visible):
     """
     Determine the appropriate title for the STF graph based on trace visibility.
-    
+
     Parameters:
         stf_visible (bool): Whether the STF trace is visible
         vavg_visible (bool): Whether the V_avg trace is visible
-    
+
     Returns:
         str: The appropriate title text
     """
@@ -1174,76 +1180,76 @@ def determine_stf_graph_title(stf_visible, vavg_visible):
 def determine_title_from_figure(figure, compare_metric):
     """
     Determine the appropriate title based on visible traces in the figure.
-    
+
     This function examines all traces in the figure to determine which types
     of data are currently visible:
     - Main STF trace (name="STF")
     - Main Vavg trace (name="V<sub>avg</sub>")
     - Comparison traces (other names), which show either STF or Vavg data
       based on the compare_metric setting
-    
+
     Parameters:
         figure (dict or Figure): The Plotly figure object with traces
         compare_metric (str): Either "STF" or "Vavg" - determines what comparison traces show
-    
+
     Returns:
         str: The appropriate title text
     """
     if not figure:
         return "MacCready Speed-to-Fly and Average Speed"
-    
+
     # Handle both Plotly Figure objects and dictionary representations
-    if hasattr(figure, 'data'):
+    if hasattr(figure, "data"):
         traces = figure.data
-    elif 'data' in figure:
-        traces = figure['data']
+    elif "data" in figure:
+        traces = figure["data"]
     else:
         return "MacCready Speed-to-Fly and Average Speed"
-    
+
     if not traces:
         return "MacCready Speed-to-Fly and Average Speed"
-    
+
     # Track whether we have visible STF-type and Vavg-type traces
     stf_type_visible = False
     vavg_type_visible = False
-    
+
     for trace in traces:
         # Check if trace is visible - handle both attribute and dict access
-        if hasattr(trace, 'visible'):
+        if hasattr(trace, "visible"):
             # Plotly trace object
             visible = trace.visible
         elif isinstance(trace, dict):
             # Dictionary representation
-            visible = trace.get('visible', True)
+            visible = trace.get("visible", True)
         else:
             # Unknown type, assume visible
             visible = True
-            
-        if visible == False or visible == 'legendonly':
+
+        if visible == False or visible == "legendonly":
             continue
-        
+
         # Get trace name - handle both attribute and dict access
-        if hasattr(trace, 'name'):
+        if hasattr(trace, "name"):
             trace_name = trace.name
         elif isinstance(trace, dict):
-            trace_name = trace.get('name', '')
+            trace_name = trace.get("name", "")
         else:
-            trace_name = ''
-        
+            trace_name = ""
+
         # Main STF trace
-        if trace_name == 'STF':
+        if trace_name == "STF":
             stf_type_visible = True
         # Main Vavg trace
-        elif trace_name == 'V<sub>avg</sub>':
+        elif trace_name == "V<sub>avg</sub>":
             vavg_type_visible = True
         # Comparison traces (not "STF", "V<sub>avg</sub>", or debug traces)
-        elif trace_name and trace_name not in ['Solver Result']:
+        elif trace_name and trace_name not in ["Solver Result"]:
             # Comparison traces show the metric selected by compare_metric
-            if compare_metric == 'STF':
+            if compare_metric == "STF":
                 stf_type_visible = True
             else:  # compare_metric == 'Vavg'
                 vavg_type_visible = True
-    
+
     # Use the existing helper to determine the title
     return determine_stf_graph_title(stf_type_visible, vavg_type_visible)
 
@@ -1293,7 +1299,7 @@ def update_graph(
 ):
     """
     Compute polar and Speed‑to‑Fly figures, generate MacCready table data, and handle saving/clearing of STF comparison series for the selected glider and current inputs.
-    
+
     Parameters:
         data (dict): Working-state values with keys 'pilot_weight', 'wing_loading', 'v_air_horiz', and 'v_air_vert'. Values are SI magnitudes (e.g., kg, kg/m**2, m/s).
         degree (int|None): Requested polynomial degree for the polar fit; values less than 2 or None use degree 2.
@@ -1309,7 +1315,7 @@ def update_graph(
         units (str): Unit system key (e.g., 'Metric' or 'US') selecting display units for speed, sink, weight, and pressure.
         weight_or_loading (str): Labeling mode for legends/labels; expected values include 'Pilot Weight' or 'Wing Loading'.
         df_out_data (dict|None): Serialized saved STF data previously stored in localStorage (or None).
-    
+
     Returns:
         tuple:
             glider_name_used (str): Glider name used for display.
@@ -1787,69 +1793,71 @@ def update_graph(
 def update_stf_title_on_restyle(restyle_data, current_figure, compare_metric):
     """
     Update the STF graph title when user toggles trace visibility via legend.
-    
+
     This callback responds to restyleData changes (e.g., clicking legend items)
     and updates the graph title to reflect which traces are currently visible.
     Takes into account both main traces (STF, Vavg) and comparison traces,
     which show either STF or Vavg data based on the compare_metric setting.
     Preserves any existing subtitle.
-    
+
     Parameters:
         restyle_data (list): Plotly restyleData containing visibility changes
         current_figure (dict): Current state of the STF graph figure
         compare_metric (str): Either "STF" or "Vavg" - determines what comparison traces show
-    
+
     Returns:
         dict: Updated figure with appropriate title
     """
     if not restyle_data or not current_figure:
         raise dash.exceptions.PreventUpdate
-    
+
     # restyleData format: [{'visible': [True/False/'legendonly']}, [trace_indices]]
     changes = restyle_data[0]
     trace_indices = restyle_data[1] if len(restyle_data) > 1 else None
-    
+
     # If no visibility changes, don't update
-    if 'visible' not in changes:
+    if "visible" not in changes:
         raise dash.exceptions.PreventUpdate
-    
+
     # Apply the visibility changes to the figure before determining the title
-    traces = current_figure.get('data', [])
+    traces = current_figure.get("data", [])
     if not traces:
         raise dash.exceptions.PreventUpdate
-    
+
     # Update trace visibility based on restyleData
     if trace_indices is not None:
-        visibility = changes['visible']
+        visibility = changes["visible"]
         for i, trace_idx in enumerate(trace_indices):
             if trace_idx < len(traces):
                 if isinstance(visibility, list):
-                    traces[trace_idx]['visible'] = visibility[i]
+                    traces[trace_idx]["visible"] = visibility[i]
                 else:
-                    traces[trace_idx]['visible'] = visibility
-    
+                    traces[trace_idx]["visible"] = visibility
+
     # Determine the new title based on all visible traces (after applying changes)
     new_title_text = determine_title_from_figure(current_figure, compare_metric)
-    
+
     # Get current title structure to preserve subtitle
-    current_title = current_figure.get('layout', {}).get('title', {})
-    
+    current_title = current_figure.get("layout", {}).get("title", {})
+
     # Create updated title, preserving subtitle if it exists
     updated_title = {
         "text": new_title_text,
-        "y": current_title.get('y', 0.9),
-        "x": current_title.get('x', 0.5),
-        "xanchor": current_title.get('xanchor', 'center'),
-        "yanchor": current_title.get('yanchor', 'top'),
+        "y": current_title.get("y", 0.9),
+        "x": current_title.get("x", 0.5),
+        "xanchor": current_title.get("xanchor", "center"),
+        "yanchor": current_title.get("yanchor", "top"),
     }
-    
+
     # Preserve subtitle if it exists
-    if 'subtitle' in current_title:
-        updated_title['subtitle'] = current_title['subtitle']
-    
+    if "subtitle" in current_title:
+        updated_title["subtitle"] = current_title["subtitle"]
+
     # Update the figure's title
-    current_figure['layout']['title'] = updated_title
-    
+    layout = current_figure.get("layout") or {}
+    layout["title"] = updated_title
+    current_figure["layout"] = layout
+
     return current_figure
 
 
