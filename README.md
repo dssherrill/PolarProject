@@ -4,6 +4,9 @@ Displays performance charts derived from a glider's polar curve
 Calculates speed-to-fly by solving Reichmann's Speed-to-Fly (STF) equation (see 
 "MacCready speed to fly theory.pdf" in this project).
 
+## Active Deployment
+https://polars.up.railway.app/
+
 ## Requirements
 
 - Python 3.12 or higher
