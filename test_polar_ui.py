@@ -800,13 +800,141 @@ class TestSTFGraphTitle:
         assert title == "MacCready Speed-to-Fly and Average Speed"
 
 
+class TestDetermineTitleFromFigure:
+    """Test cases for determine_title_from_figure function"""
+
+    def test_empty_figure(self):
+        """Test with empty figure"""
+        title = polar_ui.determine_title_from_figure({}, "STF")
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
+    def test_both_main_traces_visible(self):
+        """Test with both main traces visible"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
+    def test_only_stf_visible(self):
+        """Test with only STF visible"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": False},
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "MacCready Speed-to-Fly"
+
+    def test_only_vavg_visible(self):
+        """Test with only Vavg visible"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": False},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "Vavg")
+        assert title == "Average Speed"
+
+    def test_comparison_trace_stf_metric(self):
+        """Test with comparison trace showing STF data"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": False},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
+            ]
+        }
+        # When compare_metric is "STF", comparison traces show STF data
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "MacCready Speed-to-Fly"
+
+    def test_comparison_trace_vavg_metric(self):
+        """Test with comparison trace showing Vavg data"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": False},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
+            ]
+        }
+        # When compare_metric is "Vavg", comparison traces show Vavg data
+        title = polar_ui.determine_title_from_figure(figure, "Vavg")
+        assert title == "Average Speed"
+
+    def test_mixed_traces_stf_metric(self):
+        """Test with main STF and comparison trace (STF metric)"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "MacCready Speed-to-Fly"
+
+    def test_mixed_traces_vavg_metric(self):
+        """Test with main Vavg and comparison trace (Vavg metric)"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": False},
+                {"name": "V<sub>avg</sub>", "visible": True},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "Vavg")
+        assert title == "Average Speed"
+
+    def test_both_types_with_comparison(self):
+        """Test with both main traces and comparison showing different metric"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
+            ]
+        }
+        # Main STF is visible, comparison shows Vavg
+        title = polar_ui.determine_title_from_figure(figure, "Vavg")
+        assert title == "MacCready Speed-to-Fly and Average Speed"
+
+    def test_legendonly_treated_as_hidden(self):
+        """Test that legendonly traces are treated as hidden"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": "legendonly"},
+                {"name": "V<sub>avg</sub>", "visible": True},
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "Average Speed"
+
+    def test_debug_trace_ignored(self):
+        """Test that debug traces (Solver Result) are ignored"""
+        figure = {
+            "data": [
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "Solver Result", "visible": True},  # debug trace - should be ignored
+            ]
+        }
+        title = polar_ui.determine_title_from_figure(figure, "STF")
+        assert title == "MacCready Speed-to-Fly"
+
+
 class TestUpdateSTFTitleCallback:
     """Test cases for update_stf_title_on_restyle callback"""
 
     def test_update_stf_title_on_restyle_no_data(self):
         """Test that callback prevents update when no data"""
         with pytest.raises(dash.exceptions.PreventUpdate):
-            polar_ui.update_stf_title_on_restyle(None, None)
+            polar_ui.update_stf_title_on_restyle(None, None, "STF")
 
     def test_update_stf_title_on_restyle_no_visibility_change(self):
         """Test that callback prevents update when no visibility changes"""
@@ -814,7 +942,7 @@ class TestUpdateSTFTitleCallback:
         figure = {"data": [{"name": "STF", "visible": True}]}
         
         with pytest.raises(dash.exceptions.PreventUpdate):
-            polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+            polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
 
     def test_update_stf_title_on_restyle_hide_stf(self):
         """Test hiding STF trace updates title to 'Average Speed'"""
@@ -835,7 +963,7 @@ class TestUpdateSTFTitleCallback:
             },
         }
         
-        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "Average Speed"
 
     def test_update_stf_title_on_restyle_hide_vavg(self):
@@ -857,7 +985,7 @@ class TestUpdateSTFTitleCallback:
             },
         }
         
-        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "Vavg")
         assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly"
 
     def test_update_stf_title_on_restyle_show_both(self):
@@ -879,7 +1007,7 @@ class TestUpdateSTFTitleCallback:
             },
         }
         
-        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly and Average Speed"
 
     def test_update_stf_title_preserves_subtitle(self):
@@ -902,21 +1030,30 @@ class TestUpdateSTFTitleCallback:
             },
         }
         
-        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "Average Speed"
         assert result["layout"]["title"]["subtitle"]["text"] == "Subtracting Test Config"
 
-    def test_update_stf_title_missing_traces(self):
-        """Test that callback prevents update when main traces not found"""
-        restyle_data = [{"visible": [False]}, [0]]
+    def test_update_stf_title_with_comparison_traces(self):
+        """Test title update with comparison traces visible"""
+        restyle_data = [{"visible": [False]}, [0]]  # Hide main STF
         figure = {
             "data": [
-                {"name": "OtherTrace", "visible": True},
+                {"name": "STF", "visible": True},
+                {"name": "V<sub>avg</sub>", "visible": False},
+                {"name": "ASW 28,100.0 kg,d5", "visible": True},  # comparison trace
             ],
             "layout": {
-                "title": {"text": "Some Title"}
+                "title": {
+                    "text": "MacCready Speed-to-Fly",
+                    "y": 0.9,
+                    "x": 0.5,
+                    "xanchor": "center",
+                    "yanchor": "top",
+                }
             },
         }
         
-        with pytest.raises(dash.exceptions.PreventUpdate):
-            polar_ui.update_stf_title_on_restyle(restyle_data, figure)
+        # Main STF hidden, but comparison trace shows STF data
+        result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
+        assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly"
