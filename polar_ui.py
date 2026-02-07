@@ -1770,11 +1770,11 @@ def update_stf_title_on_restyle(restyle_data, current_figure):
                 new_vis = visibility[idx_in_changes]
             else:
                 new_vis = visibility
-            return new_vis is True or new_vis == True
+            return new_vis == True
         else:
             # Use current visibility from figure
             current_vis = traces[trace_idx].get('visible', True)
-            return current_vis is True or current_vis == True
+            return current_vis == True
     
     stf_visible = is_trace_visible(stf_trace_idx)
     vavg_visible = is_trace_visible(vavg_trace_idx)
