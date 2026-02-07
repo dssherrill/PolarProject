@@ -217,7 +217,7 @@ def add_weight_choice():
                                                 "Select:",
                                                 html_for="radio-weight-or-loading",
                                                 id="input-choice-prompt",
-                                                className="text-primary fs-5",
+                                                className="text-primary fs-5 ms-3",
                                             ),
                                             dbc.RadioItems(
                                                 options=[
@@ -249,23 +249,26 @@ def add_weight_choice():
                                                                         debounce=0.75,
                                                                         persistence=True,
                                                                         persistence_type="local",
-                                                                        className="ms-3 mt-6",
+                                                                        className="mt-3 ms-3",
                                                                     ),
                                                                     html.Br(),
                                                                     dbc.Label(
                                                                         "Pilot + Ballast weight (kg):",
                                                                         html_for="pilot-weight-input",
                                                                         id="pilot-weight-label",
-                                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                                        className="ms-3",
                                                                     ),
                                                                 ],
-                                                                className="w-100 mt-auto",
+                                                                className="mt-auto",
                                                             ),
                                                         ],
                                                     ),
                                                 ],
-                                                style={"text-align": "right"},
-                                                className="mt-6",
+                                                style={
+                                                    "text-align": "center",
+                                                    "flex": "1 1 250px",
+                                                },
+                                                className="mt-1",
                                                 id="pilot-weight-row",
                                             ),
                                             html.Div(
@@ -278,23 +281,26 @@ def add_weight_choice():
                                                         debounce=0.75,
                                                         persistence=True,
                                                         persistence_type="local",
-                                                        className="ms-3 mt-6",
+                                                        className="mt-3 ms-3",
                                                     ),
                                                     html.Br(),
                                                     dbc.Label(
                                                         "Wing Loading (kg/m²)",
                                                         html_for="wing-loading-input",
                                                         id="wing-loading-label",
-                                                        className="w-100 ms-3 fs-6 fw-light",
+                                                        className="ms-3",
                                                     ),
                                                 ],
-                                                style={"text-align": "right"},
-                                                className="mt-6",
+                                                style={
+                                                    "text-align": "center",
+                                                    "flex": "1 1 250px",
+                                                },
+                                                className="mt-3",
                                                 id="wing-loading-row",
                                             ),
                                         ],
                                         direction="horizontal",
-                                        className="w-100 hstack gap-3 m-3",
+                                        className="hstack flex-wrap",
                                     ),
                                 ],
                                 width=True,
@@ -309,16 +315,16 @@ def add_weight_choice():
                                         add_polynomial_degree(),
                                     ]
                                 ),
-                                className="m-3 mt-auto",
+                                className="mt-auto",
                                 width=True,
                             ),
                         ],
                     ),
                 ],
-                className="border-primary mt-3 w-100",
+                className="flex-wrap border-primary mt-3 mb-3",
             ),
         ],
-        className="w-100",
+        className="flex-wrap",
     )
 
 
@@ -346,7 +352,7 @@ def add_polynomial_degree():
                 debounce=0.75,
             ),
         ],
-        className="w-100",
+        className="mb-3 ms-3",
     )
 
 
@@ -393,7 +399,7 @@ def add_polynomial_statistics():
                         ],
                     ),
                 ],
-                className="border-primary mt-3 w-100",
+                className="border-primary mt-2 w-100",
             )
         ],
         className="w-100",
@@ -554,7 +560,7 @@ def add_units_selection():
                     direction="horizontal",
                     className="hstack m-3",  # gap-3 m-3 align-items-start",
                 ),
-                className="border-primary mt-3 w-100",
+                className="border-primary mb-2",
             ),
         ],
     )
@@ -725,7 +731,7 @@ app.layout = dbc.Container(
                         add_graph("graph-polar"),
                     ],
                     md=4,
-                    className="mt-auto m-1",  # border-primary",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # border-primary",  # force content to the bottom of the column
                     style={
                         "border": "2px solid #ccc",
                         "padding": "10px",
@@ -738,7 +744,7 @@ app.layout = dbc.Container(
                         add_graph("graph-stf"),
                     ],
                     md=4,
-                    className="mt-auto m-1",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # force content to the bottom of the column
                     style={
                         "border": "2px solid #ccc",
                         "padding": "10px",
@@ -748,7 +754,7 @@ app.layout = dbc.Container(
                 dbc.Col(
                     add_mc_aggrid(),
                     md=3,
-                    className="mt-auto",  # force content to the bottom of the column
+                    className="mt-auto m-2",  # force content to the bottom of the column
                 ),
             ],
             className=full_width_class,
@@ -1893,7 +1899,9 @@ def update_stf_title_on_restyle(restyle_data, current_figure, compare_metric):
         updated_title["subtitle"] = current_title["subtitle"]
 
     # Update the figure's title
-    current_figure["layout"]["title"] = updated_title
+    layout = current_figure.get("layout") or {}
+    layout["title"] = updated_title
+    current_figure["layout"] = layout
 
     return current_figure
 
