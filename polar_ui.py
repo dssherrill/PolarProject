@@ -1762,12 +1762,15 @@ def update_graph(
     results = current_polar.fit_results()
     latex_out = f"$R^2=$ {(results['R value']**2):.4g}\n"
     logger.debug(f"Fit results: {results}")
+
     latex_out += f"$MSE=$ {results['MSE']:.4g}\n"
+
     c = results["Coefficients"]
-    print(c)
+    logger.debug(f"Polynomial coefficients: {c}")
     latex_out += f"\n\n$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
     for i in range(2, len(c)):
-        latex_out += f"$+($ {c[i]:.8g}$\\times v^{i})$"
+        latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
+
     latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
     latex_out += results["Messages"]
 
