@@ -38,7 +38,7 @@ logger.debug(f"Logging configured with level: {log_level_name}")
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize a filename by removing invalid filesystem characters.
+    r"""Sanitize a filename by removing invalid filesystem characters.
 
     Removes or replaces characters that are invalid in Windows/Unix filenames:
     / \ : * ? " < > |
@@ -1149,6 +1149,105 @@ def process_unit_change(
     )
 
 
+def determine_stf_graph_title(stf_visible, vavg_visible):
+    """
+    Determine the appropriate title for the STF graph based on trace visibility.
+    
+    Parameters:
+        stf_visible (bool): Whether the STF trace is visible
+        vavg_visible (bool): Whether the V_avg trace is visible
+    
+    Returns:
+        str: The appropriate title text
+    """
+    if stf_visible and vavg_visible:
+        return "MacCready Speed-to-Fly and Average Speed"
+    elif stf_visible:
+        return "MacCready Speed-to-Fly"
+    elif vavg_visible:
+        return "Average Speed"
+    else:
+        # Both hidden - default to full title
+        return "MacCready Speed-to-Fly and Average Speed"
+
+
+def determine_title_from_figure(figure, compare_metric):
+    """
+    Determine the appropriate title based on visible traces in the figure.
+    
+    This function examines all traces in the figure to determine which types
+    of data are currently visible:
+    - Main STF trace (name="STF")
+    - Main Vavg trace (name="V<sub>avg</sub>")
+    - Comparison traces (other names), which show either STF or Vavg data
+      based on the compare_metric setting
+    
+    Parameters:
+        figure (dict or Figure): The Plotly figure object with traces
+        compare_metric (str): Either "STF" or "Vavg" - determines what comparison traces show
+    
+    Returns:
+        str: The appropriate title text
+    """
+    if not figure:
+        return "MacCready Speed-to-Fly and Average Speed"
+    
+    # Handle both Plotly Figure objects and dictionary representations
+    if hasattr(figure, 'data'):
+        traces = figure.data
+    elif 'data' in figure:
+        traces = figure['data']
+    else:
+        return "MacCready Speed-to-Fly and Average Speed"
+    
+    if not traces:
+        return "MacCready Speed-to-Fly and Average Speed"
+    
+    # Track whether we have visible STF-type and Vavg-type traces
+    stf_type_visible = False
+    vavg_type_visible = False
+    
+    for trace in traces:
+        # Check if trace is visible - handle both attribute and dict access
+        if hasattr(trace, 'visible'):
+            # Plotly trace object
+            visible = trace.visible
+        elif isinstance(trace, dict):
+            # Dictionary representation
+            visible = trace.get('visible', True)
+        else:
+            # Unknown type, assume visible
+            visible = True
+            
+        if visible == False or visible == 'legendonly':
+            continue
+        
+        # Get trace name - handle both attribute and dict access
+        if hasattr(trace, 'name'):
+            trace_name = trace.name
+        elif isinstance(trace, dict):
+            trace_name = trace.get('name', '')
+        else:
+            trace_name = ''
+        
+        # Main STF trace
+        if trace_name == 'STF':
+            stf_type_visible = True
+        # Main Vavg trace
+        elif trace_name == 'V<sub>avg</sub>':
+            vavg_type_visible = True
+        # Comparison traces (not "STF", "V<sub>avg</sub>", or debug traces)
+        elif trace_name and trace_name not in ['Solver Result']:
+            # Comparison traces show the metric selected by compare_metric
+            if compare_metric == 'STF':
+                stf_type_visible = True
+            else:  # compare_metric == 'Vavg'
+                vavg_type_visible = True
+    
+    # Use the existing helper to determine the title
+    return determine_stf_graph_title(stf_type_visible, vavg_type_visible)
+
+
 ##################################################################
 @callback(
     Output(component_id="main-title", component_property="children"),
@@ -1457,8 +1556,10 @@ def update_graph(
             secondary_y=True,
         )
 
+    # Determine initial title based on all visible traces in the figure
+    # This accounts for main traces (STF, Vavg) and comparison traces
     stf_graph_title = {
-        "text": "MacCready Speed-to-Fly and Average Speed",
+        "text": determine_title_from_figure(stf_graph, compare_metric),
         "y": 0.9,
         "x": 0.5,
         "xanchor": "center",
@@ -1672,6 +1773,84 @@ def update_graph(
         ),  # disable the "Clear Comparison" button if there is no data saved
         df_out_data_return,
     )
+
+
+##################################################################
+# Callback to update graph title based on trace visibility
+@callback(
+    Output(component_id="graph-stf", component_property="figure", allow_duplicate=True),
+    Input(component_id="graph-stf", component_property="restyleData"),
+    State(component_id="graph-stf", component_property="figure"),
+    State(component_id="radio-compare-metric", component_property="value"),
+    prevent_initial_call=True,
+)
+def update_stf_title_on_restyle(restyle_data, current_figure, compare_metric):
+    """
+    Update the STF graph title when user toggles trace visibility via legend.
+    
+    This callback responds to restyleData changes (e.g., clicking legend items)
+    and updates the graph title to reflect which traces are currently visible.
+    Takes into account both main traces (STF, Vavg) and comparison traces,
+    which show either STF or Vavg data based on the compare_metric setting.
+    Preserves any existing subtitle.
+    
+    Parameters:
+        restyle_data (list): Plotly restyleData containing visibility changes
+        current_figure (dict): Current state of the STF graph figure
+        compare_metric (str): Either "STF" or "Vavg" - determines what comparison traces show
+    
+    Returns:
+        dict: Updated figure with appropriate title
+    """
+    if not restyle_data or not current_figure:
+        raise dash.exceptions.PreventUpdate
+    
+    # restyleData format: [{'visible': [True/False/'legendonly']}, [trace_indices]]
+    changes = restyle_data[0]
+    trace_indices = restyle_data[1] if len(restyle_data) > 1 else None
+    
+    # If no visibility changes, don't update
+    if 'visible' not in changes:
+        raise dash.exceptions.PreventUpdate
+    
+    # Apply the visibility changes to the figure before determining the title
+    traces = current_figure.get('data', [])
+    if not traces:
+        raise dash.exceptions.PreventUpdate
+    
+    # Update trace visibility based on restyleData
+    if trace_indices is not None:
+        visibility = changes['visible']
+        for i, trace_idx in enumerate(trace_indices):
+            if trace_idx < len(traces):
+                if isinstance(visibility, list):
+                    traces[trace_idx]['visible'] = visibility[i]
+                else:
+                    traces[trace_idx]['visible'] = visibility
+    
+    # Determine the new title based on all visible traces (after applying changes)
+    new_title_text = determine_title_from_figure(current_figure, compare_metric)
+    
+    # Get current title structure to preserve subtitle
+    current_title = current_figure.get('layout', {}).get('title', {})
+    
+    # Create updated title, preserving subtitle if it exists
+    updated_title = {
+        "text": new_title_text,
+        "y": current_title.get('y', 0.9),
+        "x": current_title.get('x', 0.5),
+        "xanchor": current_title.get('xanchor', 'center'),
+        "yanchor": current_title.get('yanchor', 'top'),
+    }
+    
+    # Preserve subtitle if it exists
+    if 'subtitle' in current_title:
+        updated_title['subtitle'] = current_title['subtitle']
+    
+    # Update the figure's title
+    current_figure['layout']['title'] = updated_title
+    
+    return current_figure
 
 
 ##################################################################
