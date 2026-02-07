@@ -1793,7 +1793,7 @@ def update_graph(
         )
         latex_out = "**Error**: Polynomial fit failed. Cannot display results.\n\n"
         if results and results.get("Messages"):
-            latex_out += results["Messages"]
+            latex_out += results.get("Messages") or ""
     else:
         # Safe to format latex_out using results and c = results["Coefficients"]
         c = results["Coefficients"]
