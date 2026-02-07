@@ -1806,7 +1806,7 @@ def update_graph(
             latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
 
         latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
-        latex_out += results["Messages"]
+        latex_out += results.get("Messages") or ""
 
     logger.debug("update_graph return\n")
     return (
