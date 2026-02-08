@@ -1604,8 +1604,6 @@ def update_graph(
     df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
     df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
 
-    logger.info(current_polar.messages())
-
     # Store MacCready results in DataFrame for AG Grid
     # AG Grid is arranged as MC, STF, Vavg, L/D
     new_column_defs = [
@@ -1836,21 +1834,21 @@ def update_graph(
 
         latex_out += results["Messages"]
 
-        logger.debug("update_graph return\n")
-        return (
-            "",  # glider_name,
-            latex_out,
-            polar_graph,
-            stf_graph,
-            df_mc_table.to_dict("records"),
-            new_column_defs,
-            "sizeToFit",
-            degree,
-            (
-                df_out_data_return is None
-            ),  # disable the "Clear Comparison" button if there is no data saved
-            df_out_data_return,
-        )
+    logger.debug("update_graph return\n")
+    return (
+        "",  # glider_name,
+        latex_out,
+        polar_graph,
+        stf_graph,
+        df_mc_table.to_dict("records"),
+        new_column_defs,
+        "sizeToFit",
+        degree,
+        (
+            df_out_data_return is None
+        ),  # disable the "Clear Comparison" button if there is no data saved
+        df_out_data_return,
+    )
 
 
 ##################################################################
