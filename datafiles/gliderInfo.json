@@ -45,11 +45,11 @@
         "polarSinkUnits":"m\/s"
     },
     {
-        "name":"SGS 1-34C",
-        "wingArea":"151 ft**2",        
+        "name":"SGS 1-35C",
+        "wingArea":"103.8 ft**2",        
         "referenceWeight":"565.0 lbs",
         "emptyWeight": "360.0 lbs",
-        "polarFileName":"SGS 1-34C.csv",
+        "polarFileName":"SGS 1-35C.csv",
         "polarSpeedUnits":"mph",
         "polarSinkUnits":"ft\/sec"
     },
