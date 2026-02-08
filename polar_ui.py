@@ -1604,8 +1604,6 @@ def update_graph(
     df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
     df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
 
-    logger.info(current_polar.messages())
-
     # Store MacCready results in DataFrame for AG Grid
     # AG Grid is arranged as MC, STF, Vavg, L/D
     new_column_defs = [
@@ -1787,6 +1785,7 @@ def update_graph(
         or results.get("MSE") is None
         or results.get("Coefficients") is None
         or not hasattr(results["Coefficients"], "__getitem__")
+        or len(results["Coefficients"]) < 2
     ):
         logger.error(
             "Polynomial fit results are incomplete or invalid; cannot format LaTeX output"
@@ -1799,13 +1798,45 @@ def update_graph(
         c = results["Coefficients"]
         logger.debug(f"Polynomial coefficients: {c}")
 
-        latex_out = f"$R^2=$ {(results['R value']**2):.4g}\n"
-        latex_out += f"$MSE=$ {results['MSE']:.4g}\n"
-        latex_out += f"\n\n$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
+        latex_out = f"$Sink = {c[0]:.8g}  ({c[1]:+.8g} * v)"
         for i in range(2, len(c)):
-            latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
+            latex_out += f"({c[i]:+.8g}*v^{{{i}}})"
+        latex_out += r"$"
 
-        latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
+        # Move + or - outside the parentheses
+        latex_out = re.sub(r"\(([+-])", r" \1 (", latex_out)
+
+        # Replace * with \times
+        # This must be done before replacing scientific notation to avoid conflicts
+        # Coderabbit AI suggests that "*" could occur inside scientific notation.
+        # I'm not familiar with that, but perhaps in some locales...
+        latex_out = latex_out.replace("*", r"{\times}")
+
+        # Now, replace scientific notation using E with notation using 10^x.
+        def replace_scientific_notation(match):
+            mantissa = match.group(1)
+            exponent = str(
+                int(match.group(2))
+            )  # remove leading zeroes and strip plus sign
+            return f" {mantissa}{{\\times}}10^{{{exponent}}}"
+
+        latex_out = re.sub(
+            r"([+-]?\d*\.?\d+)e([+-]?\d+)", replace_scientific_notation, latex_out
+        )
+
+        # Surround mantissas with $ to escape out of Latex and put them in the normal text font
+        # This fails is locales that use , instead of .
+        # It also allows line breaks where we do not want them.
+        # latex_out = re.sub(r"(\d+\.\d+)", r"$ \1 ${", latex_out)
+
+        # Allow lines to break by insert an invisible space in non-math text at every + or -
+        # (but don't alter exponents)
+        latex_out = re.sub(r"([+-]) \(", r"\!$  $\1 (", latex_out)
+
+        latex_out += "\nwhere $v$ is the airspeed; $Sink$ and $v$ are in m/s.\n\n"
+        latex_out += f"$R^2=$ {(results['R value']**2):.5f}\n"
+        latex_out += f"$MSE=$ {results['MSE']:.4g}\n\n"
+
         latex_out += results["Messages"]
 
     logger.debug("update_graph return\n")

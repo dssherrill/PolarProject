@@ -1,0 +1,9 @@
+/* This hides the MathJax context menu and prevents interaction. */
+/* Otherwise, users can right-click on an equation and select    */
+/* an alternate renderer.  That can stop the equation from       */
+/* rendering at all.  The user would have to clear localStorage  */
+/* (or site settings) to fix it. */
+.mjx-container, .MathJax_Display, .MathJax {
+    pointer-events: none !important;
+    user-select: text; /* Allows users to still highlight the text if needed */
+}
