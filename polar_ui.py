@@ -1799,30 +1799,58 @@ def update_graph(
         c = results["Coefficients"]
         logger.debug(f"Polynomial coefficients: {c}")
 
-        latex_out = f"$Sink =$ {c[0]:.8g}$+ ($ {c[1]:.8g}$\\times v)$"
+        latex_out = f"$Sink = {c[0]:.8g}  ({c[1]:+.8g} * v)"
         for i in range(2, len(c)):
-            latex_out += f"$+($ {c[i]:.8g}$\\times v^{{{i}}})$"
+            latex_out += f"({c[i]:+.8g}*v^{{{i}}})"
+        latex_out += r"$"
 
-        latex_out += "\nwhere $v$ is the airspeed and both $Sink$ and $v$ are in meters per second.\n\n"
+        # Move + or - outside the parentheses
+        latex_out = re.sub(r"\(([+-])", r" \1 (", latex_out)
+
+        # Replace * with \times
+        latex_out = latex_out.replace("*", r"{\times}")
+
+        # Now, replace scientific notation using E with notation using 10^x.
+        def remove_leading_zeroes_and_strip_plus_sign(exponent):
+            return str(int(exponent))
+
+        def replace_scientific_notation(match):
+            mantissa = match.group(1)
+            exponent = remove_leading_zeroes_and_strip_plus_sign(match.group(2))
+            return f" {mantissa}{{\\times}}10^{{{exponent}}}"
+
+        latex_out = re.sub(
+            r"([+-]?\d*\.?\d+)e([+-]?\d+)", replace_scientific_notation, latex_out
+        )
+
+        # Surround mantissas with $ to escape out of Latex and put them in the normal text font
+        # latex_out = re.sub(r"(\d+\.\d+)", r"$</span>\1<span>${", latex_out)
+
+        # Allow lines to break by insert an invisible space in non-math text at every + or -
+        # (but don't alter exponents)
+        latex_out = re.sub(r"([+-]) \(", r"\!$  $\1 (", latex_out)
+
+        latex_out += "\nwhere $v$ is the airspeed; $Sink$ and $v$ are in m/s.\n\n"
         latex_out += f"$R^2=$ {(results['R value']**2):.5f}\n"
         latex_out += f"$MSE=$ {results['MSE']:.4g}\n\n"
+
         latex_out += results["Messages"]
 
-    logger.debug("update_graph return\n")
-    return (
-        "",  # glider_name,
-        latex_out,
-        polar_graph,
-        stf_graph,
-        df_mc_table.to_dict("records"),
-        new_column_defs,
-        "sizeToFit",
-        degree,
-        (
-            df_out_data_return is None
-        ),  # disable the "Clear Comparison" button if there is no data saved
-        df_out_data_return,
-    )
+        logger.debug("update_graph return\n")
+        return (
+            "",  # glider_name,
+            latex_out,
+            polar_graph,
+            stf_graph,
+            df_mc_table.to_dict("records"),
+            new_column_defs,
+            "sizeToFit",
+            degree,
+            (
+                df_out_data_return is None
+            ),  # disable the "Clear Comparison" button if there is no data saved
+            df_out_data_return,
+        )
 
 
 ##################################################################
