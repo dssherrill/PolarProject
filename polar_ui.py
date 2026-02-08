@@ -1785,6 +1785,7 @@ def update_graph(
         or results.get("MSE") is None
         or results.get("Coefficients") is None
         or not hasattr(results["Coefficients"], "__getitem__")
+        or len(results["Coefficients"]) < 2
     ):
         logger.error(
             "Polynomial fit results are incomplete or invalid; cannot format LaTeX output"
@@ -1806,15 +1807,17 @@ def update_graph(
         latex_out = re.sub(r"\(([+-])", r" \1 (", latex_out)
 
         # Replace * with \times
+        # This must be done before replacing scientific notation to avoid conflicts
+        # Coderabbit AI suggests that "*" could occur inside scientific notation.
+        # I'm not familiar with that, but perhaps in some locales...
         latex_out = latex_out.replace("*", r"{\times}")
 
         # Now, replace scientific notation using E with notation using 10^x.
-        def remove_leading_zeroes_and_strip_plus_sign(exponent):
-            return str(int(exponent))
-
         def replace_scientific_notation(match):
             mantissa = match.group(1)
-            exponent = remove_leading_zeroes_and_strip_plus_sign(match.group(2))
+            exponent = str(
+                int(match.group(2))
+            )  # remove leading zeroes and strip plus sign
             return f" {mantissa}{{\\times}}10^{{{exponent}}}"
 
         latex_out = re.sub(
@@ -1822,7 +1825,9 @@ def update_graph(
         )
 
         # Surround mantissas with $ to escape out of Latex and put them in the normal text font
-        # latex_out = re.sub(r"(\d+\.\d+)", r"$</span>\1<span>${", latex_out)
+        # This fails is locales that use , instead of .
+        # It also allows line breaks where we do not want them.
+        # latex_out = re.sub(r"(\d+\.\d+)", r"$ \1 ${", latex_out)
 
         # Allow lines to break by insert an invisible space in non-math text at every + or -
         # (but don't alter exponents)

@@ -277,7 +277,7 @@ class Polar:
             start_index = min_sink_index
             self.__fit_results[
                 "Messages"
-            ] += f"⚠️ Notice: Polar data below minimum sink speed ({speed[min_sink_index]:.3f} m/s) excluded from fit.\nThis low-order model (degree={degree}) cannot follow the curvature near stall speed.\n"
+            ] += f"⚠️ Notice: Polar data below minimum sink speed ({speed[min_sink_index]:.3f} m/s) excluded from fit.\nThis low-order model (degree={degree}) cannot follow increasing curvature near stall speed; accurate modelling of higher speeds is more important.\n"
         else:
             start_index = 0
 
