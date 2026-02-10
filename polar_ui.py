@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 
 import numpy as np
@@ -348,6 +348,7 @@ def add_polynomial_degree():
                 type="number",
                 placeholder=DEFAULT_POLYNOMIAL_DEGREE,
                 min=2,
+                step=1,
                 className="text-start",
                 debounce=0.75,
             ),
@@ -1394,8 +1395,8 @@ def update_graph(
     weight_units = selected_units["Weight"]
     pressure_units = selected_units["Pressure"]
 
-    if degree is None:
-        degree = DEFAULT_POLYNOMIAL_DEGREE
+    # Guard against None and also against fractional values
+    degree = DEFAULT_POLYNOMIAL_DEGREE if degree is None else round(degree)
 
     if maccready is None:
         maccready = 0.0
