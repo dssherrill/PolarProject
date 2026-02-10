@@ -1395,18 +1395,22 @@ def update_graph(
     weight_units = selected_units["Weight"]
     pressure_units = selected_units["Pressure"]
 
-    # Guard against None and also against fractional values
-    degree = DEFAULT_POLYNOMIAL_DEGREE if degree is None else round(degree)
+    # Guard against None
+    if degree is None:
+        degree = DEFAULT_POLYNOMIAL_DEGREE
+
+    # Guard against fractional values
+    degree = round(degree)
+
+    # A linear model has no solutions for the MacCready equations,
+    # so the model must be a quadratic or higher order polynomial.
+    degree = max(degree, 2)
 
     if maccready is None:
         maccready = 0.0
 
     # Set the units for unitless items from the data store
     maccready = (maccready * sink_units).to("m/s")
-
-    # A linear model has no solutions for the MacCready equations,
-    # so the model must be a quadratic or higher order polynomial.
-    degree = max(degree, 2)
 
     # Get a polynomial fit to the polar curve data
     current_polar: polar_calc.Polar = load_polar(
