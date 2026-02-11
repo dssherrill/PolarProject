@@ -51,6 +51,6 @@ gunicorn polar_ui:server
 John Cochrane articles
 https://www.johnhcochrane.com/about/soaring
 
-Polar Explorer is an older program that does similar things, but goes well beyond just speed-to-fly.
+Polar Explorer is an older program that does similar things, but goes well beyond just speed-to-fly, with calculations for final glide and optimal thermalling speed and bank angle.  It also adjusts for atmospherics (temperature, pressure, altitude).
 https://www.trimill.com/CuSoft/PolarExplorer/index.htm
 
