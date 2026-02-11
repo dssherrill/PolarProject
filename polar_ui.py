@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 
 import numpy as np
@@ -348,6 +348,7 @@ def add_polynomial_degree():
                 type="number",
                 placeholder=DEFAULT_POLYNOMIAL_DEGREE,
                 min=2,
+                step=1,
                 className="text-start",
                 debounce=0.75,
             ),
@@ -1394,18 +1395,22 @@ def update_graph(
     weight_units = selected_units["Weight"]
     pressure_units = selected_units["Pressure"]
 
+    # Guard against None
     if degree is None:
         degree = DEFAULT_POLYNOMIAL_DEGREE
+
+    # Guard against fractional values
+    degree = round(degree)
+
+    # A linear model has no solutions for the MacCready equations,
+    # so the model must be a quadratic or higher order polynomial.
+    degree = max(degree, 2)
 
     if maccready is None:
         maccready = 0.0
 
     # Set the units for unitless items from the data store
     maccready = (maccready * sink_units).to("m/s")
-
-    # A linear model has no solutions for the MacCready equations,
-    # so the model must be a quadratic or higher order polynomial.
-    degree = max(degree, 2)
 
     # Get a polynomial fit to the polar curve data
     current_polar: polar_calc.Polar = load_polar(
