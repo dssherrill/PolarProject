@@ -1006,6 +1006,22 @@ def process_unit_change(
         else current_glider.reference_wing_loading()
     )
 
+    if dash.ctx.triggered_id == "glider-dropdown":
+        if weight_or_loading == "Pilot Weight":
+            # Update the wing loading if the glider selection changes and "Pilot Weight" is selected
+            working_wing_loading = current_glider.wing_loading(working_pilot_weight)
+            wing_loading = working_wing_loading.magnitude
+            logger.debug(
+                f"Updated wing loading: {working_wing_loading} based on pilot weight: {working_pilot_weight}"
+            )
+        else:
+            # Update the pilot weight if the glider selection changes and "Wing Loading" is selected
+            working_pilot_weight = current_glider.pilot_weight(working_wing_loading)
+            pilot_weight = working_pilot_weight.magnitude
+            logger.debug(
+                f"Updated pilot weight: {working_pilot_weight} based on wing loading: {working_wing_loading}"
+            )
+
     # Disable dump file option in production mode
     set_props("toggle-switch-dump", {"disabled": _production_mode})
 
@@ -1054,7 +1070,11 @@ def process_unit_change(
             working_pilot_weight = gross_weight - current_glider.empty_weight()
             pilot_weight = working_pilot_weight.magnitude
 
-    pilot_weight_label = f"Min 0.0 {weight_units.units:~P} (Pilot + Ballast)"
+    # Do not put zero here; the true min pilot weight is given in the flight manual and is not zero
+    pilot_weight_label = f"{weight_units.units:~P}"
+
+    # The true min wing loading would take the true minimum pilot weight into account.
+    # The min value reported here corresponds to zero pilot weight.
     wing_loading_label = f"Min {min_wing_loading_display} {pressure_units.units:~P}"
 
     pilot_weight_placeholder = (
