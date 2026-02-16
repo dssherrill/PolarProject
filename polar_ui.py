@@ -96,7 +96,14 @@ US_UNITS = {
     "Wing Area": ureg("ft**2"),
     "Pressure": ureg("lbs/ft**2"),
 }
-UNIT_CHOICES = {"Metric": METRIC_UNITS, "US": US_UNITS}
+US_MPH_UNITS = {
+    "Speed": ureg("mph"),
+    "Sink": ureg("knots"),
+    "Weight": ureg("lbs"),
+    "Wing Area": ureg("ft**2"),
+    "Pressure": ureg("lbs/ft**2"),
+}
+UNIT_CHOICES = {"Metric": METRIC_UNITS, "US": US_UNITS, "US MPH": US_MPH_UNITS}
 
 
 def get_cached_glider(glider_name, current_glider_info) -> glider.Glider:
@@ -159,6 +166,7 @@ initial_glider_data = pd.DataFrame(
         ],
         "Metric": ["-- kg", "-- kg", "-- kg", "-- kg", "-- kg/m²"],
         "US": ["-- lbs", "-- lbs", "-- lbs", "-- lbs", "-- lb/ft²"],
+        "US MPH": ["-- lbs", "-- lbs", "-- lbs", "-- lbs", "-- lb/ft²"],
     },
 )
 
@@ -549,7 +557,7 @@ def add_units_selection():
                             html_for="radio-units",
                         ),
                         dbc.RadioItems(
-                            options=["Metric", "US"],
+                            options=["Metric", "US", "US MPH"],
                             value="Metric",
                             inline=False,
                             id="radio-units",
@@ -699,6 +707,7 @@ app.layout = dbc.Container(
                                 {"field": "Label"},
                                 {"field": "Metric"},
                                 {"field": "US"},
+                                {"field": "US MPH"},
                             ],
                             columnSize="sizeToFit",
                             dashGridOptions={"domLayout": "autoHeight"},
@@ -1126,6 +1135,13 @@ def process_unit_change(
                 f"{working_pilot_weight.to(US_UNITS['Weight']):.1f~P}",
                 f"{gross_weight.to(US_UNITS['Weight']):.1f~P}",
                 f"{(working_wing_loading.to(US_UNITS['Pressure'])):.1f~P}",
+            ],
+            "US MPH": [
+                f"{current_glider.reference_weight().to(US_MPH_UNITS['Weight']):.1f~P}",
+                f"{current_glider.empty_weight().to(US_MPH_UNITS['Weight']):.1f~P}",
+                f"{working_pilot_weight.to(US_MPH_UNITS['Weight']):.1f~P}",
+                f"{gross_weight.to(US_MPH_UNITS['Weight']):.1f~P}",
+                f"{(working_wing_loading.to(US_MPH_UNITS['Pressure'])):.1f~P}",
             ],
         }
     )

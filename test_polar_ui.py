@@ -268,12 +268,30 @@ class TestUnitConstants:
         assert polar_ui.US_UNITS["Wing Area"] == ureg("ft**2")
         assert polar_ui.US_UNITS["Pressure"] == ureg("lbs/ft**2")
 
+    def test_us_mph_units_structure(self):
+        """Test that US_MPH_UNITS has correct structure"""
+        assert "Speed" in polar_ui.US_MPH_UNITS
+        assert "Sink" in polar_ui.US_MPH_UNITS
+        assert "Weight" in polar_ui.US_MPH_UNITS
+        assert "Wing Area" in polar_ui.US_MPH_UNITS
+        assert "Pressure" in polar_ui.US_MPH_UNITS
+
+    def test_us_mph_units_values(self):
+        """Test that US_MPH_UNITS has correct values"""
+        assert polar_ui.US_MPH_UNITS["Speed"] == ureg("mph")
+        assert polar_ui.US_MPH_UNITS["Sink"] == ureg("knots")
+        assert polar_ui.US_MPH_UNITS["Weight"] == ureg("lbs")
+        assert polar_ui.US_MPH_UNITS["Wing Area"] == ureg("ft**2")
+        assert polar_ui.US_MPH_UNITS["Pressure"] == ureg("lbs/ft**2")
+
     def test_unit_choices_keys(self):
         """Test that UNIT_CHOICES has correct keys"""
         assert "Metric" in polar_ui.UNIT_CHOICES
         assert "US" in polar_ui.UNIT_CHOICES
+        assert "US MPH" in polar_ui.UNIT_CHOICES
         assert polar_ui.UNIT_CHOICES["Metric"] == polar_ui.METRIC_UNITS
         assert polar_ui.UNIT_CHOICES["US"] == polar_ui.US_UNITS
+        assert polar_ui.UNIT_CHOICES["US MPH"] == polar_ui.US_MPH_UNITS
 
 
 class TestInitialData:
@@ -291,6 +309,7 @@ class TestInitialData:
         assert "Label" in polar_ui.initial_glider_data.columns
         assert "Metric" in polar_ui.initial_glider_data.columns
         assert "US" in polar_ui.initial_glider_data.columns
+        assert "US MPH" in polar_ui.initial_glider_data.columns
 
     def test_initial_glider_data_labels(self):
         """Test that initial_glider_data has correct labels"""
