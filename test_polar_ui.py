@@ -320,6 +320,36 @@ class TestUnitConstants:
         assert polar_ui.UNIT_CHOICES["US, MPH"] == polar_ui.US_MPH_UNITS
 
 
+class TestValidateUnits:
+    """Test cases for validate_units function"""
+
+    def test_validate_units_metric(self):
+        """Test that valid 'Metric' choice is returned unchanged"""
+        assert polar_ui.validate_units("Metric") == "Metric"
+
+    def test_validate_units_us_knots(self):
+        """Test that valid 'US, Knots' choice is returned unchanged"""
+        assert polar_ui.validate_units("US, Knots") == "US, Knots"
+
+    def test_validate_units_us_mph(self):
+        """Test that valid 'US, MPH' choice is returned unchanged"""
+        assert polar_ui.validate_units("US, MPH") == "US, MPH"
+
+    def test_validate_units_legacy_us(self):
+        """Test that legacy 'US' choice is converted to 'US, Knots'"""
+        assert polar_ui.validate_units("US") == "US, Knots"
+
+    def test_validate_units_invalid_string(self):
+        """Test that invalid string choice defaults to 'Metric'"""
+        assert polar_ui.validate_units("InvalidChoice") == "Metric"
+        assert polar_ui.validate_units("Random") == "Metric"
+        assert polar_ui.validate_units("") == "Metric"
+
+    def test_validate_units_none(self):
+        """Test that None defaults to 'Metric'"""
+        assert polar_ui.validate_units(None) == "Metric"
+
+
 class TestInitialData:
     """Test cases for initial data structures"""
 
