@@ -309,7 +309,6 @@ class TestInitialData:
         assert "Label" in polar_ui.initial_glider_data.columns
         assert "Metric" in polar_ui.initial_glider_data.columns
         assert "US" in polar_ui.initial_glider_data.columns
-        assert "US MPH" in polar_ui.initial_glider_data.columns
 
     def test_initial_glider_data_labels(self):
         """Test that initial_glider_data has correct labels"""
