@@ -24,7 +24,6 @@ import polar_calc
 from units import ureg
 
 
-
 @pytest.fixture
 def sample_glider_info():
     """Fixture providing sample glider information DataFrame"""
@@ -89,7 +88,9 @@ def mock_polar():
         return pd.DataFrame(
             {
                 "MC": pd.array(mc_table, dtype="pint[m/s]"),
-                "STF": pd.array(np.linspace(25, 40, n) * ureg("m/s"), dtype="pint[m/s]"),
+                "STF": pd.array(
+                    np.linspace(25, 40, n) * ureg("m/s"), dtype="pint[m/s]"
+                ),
                 "Vavg": pd.array(
                     np.linspace(20, 35, n) * ureg("m/s"), dtype="pint[m/s]"
                 ),
@@ -113,7 +114,12 @@ class TestLoadPolar:
             MockPolar.return_value = mock_polar_instance
 
             result = polar_ui.load_polar(
-                mock_glider, degree=5, goal_function="Reichmann", v_air_horiz=0.0, v_air_vert=0.0, pilot_weight=100.0
+                mock_glider,
+                degree=5,
+                goal_function="Reichmann",
+                v_air_horiz=0.0,
+                v_air_vert=0.0,
+                pilot_weight=100.0,
             )
 
             MockPolar.assert_called_once_with(
@@ -129,7 +135,12 @@ class TestLoadPolar:
 
             for degree in [2, 3, 5, 7]:
                 polar_ui.load_polar(
-                    mock_glider, degree=degree, goal_function="Reichmann", v_air_horiz=0.0, v_air_vert=0.0, pilot_weight=100.0
+                    mock_glider,
+                    degree=degree,
+                    goal_function="Reichmann",
+                    v_air_horiz=0.0,
+                    v_air_vert=0.0,
+                    pilot_weight=100.0,
                 )
 
                 # Check that degree was passed correctly
@@ -143,7 +154,12 @@ class TestLoadPolar:
 
             for goal in ["Reichmann", "Test"]:
                 polar_ui.load_polar(
-                    mock_glider, degree=5, goal_function=goal, v_air_horiz=0.0, v_air_vert=0.0, pilot_weight=100.0
+                    mock_glider,
+                    degree=5,
+                    goal_function=goal,
+                    v_air_horiz=0.0,
+                    v_air_vert=0.0,
+                    pilot_weight=100.0,
                 )
 
                 assert MockPolar.call_args[0][2] == goal
@@ -155,7 +171,12 @@ class TestLoadPolar:
             MockPolar.return_value = mock_polar_instance
 
             polar_ui.load_polar(
-                mock_glider, degree=5, goal_function="Reichmann", v_air_horiz=5.0, v_air_vert=1.0, pilot_weight=100.0
+                mock_glider,
+                degree=5,
+                goal_function="Reichmann",
+                v_air_horiz=5.0,
+                v_air_vert=1.0,
+                pilot_weight=100.0,
             )
 
             call_args = MockPolar.call_args[0]
@@ -169,7 +190,12 @@ class TestLoadPolar:
             MockPolar.return_value = mock_polar_instance
 
             polar_ui.load_polar(
-                mock_glider, degree=5, goal_function="Reichmann", v_air_horiz=0.0, v_air_vert=0.0, pilot_weight=None
+                mock_glider,
+                degree=5,
+                goal_function="Reichmann",
+                v_air_horiz=0.0,
+                v_air_vert=0.0,
+                pilot_weight=None,
             )
 
             call_args = MockPolar.call_args[0]
@@ -268,12 +294,30 @@ class TestUnitConstants:
         assert polar_ui.US_UNITS["Wing Area"] == ureg("ft**2")
         assert polar_ui.US_UNITS["Pressure"] == ureg("lbs/ft**2")
 
+    def test_us_mph_units_structure(self):
+        """Test that US_MPH_UNITS has correct structure"""
+        assert "Speed" in polar_ui.US_MPH_UNITS
+        assert "Sink" in polar_ui.US_MPH_UNITS
+        assert "Weight" in polar_ui.US_MPH_UNITS
+        assert "Wing Area" in polar_ui.US_MPH_UNITS
+        assert "Pressure" in polar_ui.US_MPH_UNITS
+
+    def test_us_mph_units_values(self):
+        """Test that US_MPH_UNITS has correct values"""
+        assert polar_ui.US_MPH_UNITS["Speed"] == ureg("mph")
+        assert polar_ui.US_MPH_UNITS["Sink"] == ureg("knots")
+        assert polar_ui.US_MPH_UNITS["Weight"] == ureg("lbs")
+        assert polar_ui.US_MPH_UNITS["Wing Area"] == ureg("ft**2")
+        assert polar_ui.US_MPH_UNITS["Pressure"] == ureg("lbs/ft**2")
+
     def test_unit_choices_keys(self):
         """Test that UNIT_CHOICES has correct keys"""
         assert "Metric" in polar_ui.UNIT_CHOICES
-        assert "US" in polar_ui.UNIT_CHOICES
+        assert "US, Knots" in polar_ui.UNIT_CHOICES
+        assert "US, MPH" in polar_ui.UNIT_CHOICES
         assert polar_ui.UNIT_CHOICES["Metric"] == polar_ui.METRIC_UNITS
-        assert polar_ui.UNIT_CHOICES["US"] == polar_ui.US_UNITS
+        assert polar_ui.UNIT_CHOICES["US, Knots"] == polar_ui.US_UNITS
+        assert polar_ui.UNIT_CHOICES["US, MPH"] == polar_ui.US_MPH_UNITS
 
 
 class TestInitialData:
@@ -315,7 +359,9 @@ class TestProcessUnitChangeCallback:
             mock_ctx.triggered_id = None
             yield mock_ctx
 
-    def test_process_unit_change_metric_to_us(self, sample_glider_info, mock_glider, setup_dash_context):
+    def test_process_unit_change_metric_to_us(
+        self, sample_glider_info, mock_glider, setup_dash_context
+    ):
         """Test unit conversion from metric to US"""
         polar_ui._glider_cache.clear()
         polar_ui._glider_cache["ASW 28"] = mock_glider
@@ -328,7 +374,12 @@ class TestProcessUnitChangeCallback:
                 pilot_weight_or_wing_loading_in=100.0,  # 100 kg
                 v_air_horiz_in=None,
                 v_air_vert_in=None,
-                data={"pilot_weight": 100.0, "wing_loading": None, "v_air_horiz": None, "v_air_vert": None},
+                data={
+                    "pilot_weight": 100.0,
+                    "wing_loading": None,
+                    "v_air_horiz": None,
+                    "v_air_vert": None,
+                },
             )
 
             # Should return tuple with 9 elements
@@ -692,10 +743,12 @@ class TestRegressionCases:
                 {
                     "MC": pd.array(mc_table, dtype="pint[m/s]"),
                     "STF": pd.array(
-                        np.linspace(25, 40, len(mc_table)) * ureg("m/s"), dtype="pint[m/s]"
+                        np.linspace(25, 40, len(mc_table)) * ureg("m/s"),
+                        dtype="pint[m/s]",
                     ),
                     "Vavg": pd.array(
-                        np.linspace(20, 35, len(mc_table)) * ureg("m/s"), dtype="pint[m/s]"
+                        np.linspace(20, 35, len(mc_table)) * ureg("m/s"),
+                        dtype="pint[m/s]",
                     ),
                     "L/D": np.linspace(30, 40, len(mc_table)),
                     "solverResult": np.zeros(len(mc_table)),
@@ -921,7 +974,10 @@ class TestDetermineTitleFromFigure:
             "data": [
                 {"name": "STF", "visible": True},
                 {"name": "V<sub>avg</sub>", "visible": False},
-                {"name": "Solver Result", "visible": True},  # debug trace - should be ignored
+                {
+                    "name": "Solver Result",
+                    "visible": True,
+                },  # debug trace - should be ignored
             ]
         }
         title = polar_ui.determine_title_from_figure(figure, "STF")
@@ -931,21 +987,23 @@ class TestDetermineTitleFromFigure:
         """Test with actual Plotly Figure object (not dictionary)"""
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
-        
+
         # Create real Plotly figure
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        
+
         # Add traces as Plotly objects
         trace_stf = go.Scatter(x=[1, 2], y=[1, 2], name="STF", visible=True)
         fig.add_trace(trace_stf, secondary_y=False)
-        
-        trace_vavg = go.Scatter(x=[1, 2], y=[2, 3], name="V<sub>avg</sub>", visible=False)
+
+        trace_vavg = go.Scatter(
+            x=[1, 2], y=[2, 3], name="V<sub>avg</sub>", visible=False
+        )
         fig.add_trace(trace_vavg, secondary_y=False)
-        
+
         # Test with Plotly Figure object
         title = polar_ui.determine_title_from_figure(fig, "STF")
         assert title == "MacCready Speed-to-Fly"
-        
+
         # Test with both visible
         fig.data[1].visible = True
         title = polar_ui.determine_title_from_figure(fig, "STF")
@@ -964,7 +1022,7 @@ class TestUpdateSTFTitleCallback:
         """Test that callback prevents update when no visibility changes"""
         restyle_data = [{"line": {"width": 3}}, [0]]
         figure = {"data": [{"name": "STF", "visible": True}]}
-        
+
         with pytest.raises(dash.exceptions.PreventUpdate):
             polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
 
@@ -986,7 +1044,7 @@ class TestUpdateSTFTitleCallback:
                 }
             },
         }
-        
+
         result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "Average Speed"
 
@@ -1008,7 +1066,7 @@ class TestUpdateSTFTitleCallback:
                 }
             },
         }
-        
+
         result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "Vavg")
         assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly"
 
@@ -1030,9 +1088,12 @@ class TestUpdateSTFTitleCallback:
                 }
             },
         }
-        
+
         result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
-        assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly and Average Speed"
+        assert (
+            result["layout"]["title"]["text"]
+            == "MacCready Speed-to-Fly and Average Speed"
+        )
 
     def test_update_stf_title_preserves_subtitle(self):
         """Test that subtitle is preserved when updating title"""
@@ -1053,10 +1114,12 @@ class TestUpdateSTFTitleCallback:
                 }
             },
         }
-        
+
         result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "Average Speed"
-        assert result["layout"]["title"]["subtitle"]["text"] == "Subtracting Test Config"
+        assert (
+            result["layout"]["title"]["subtitle"]["text"] == "Subtracting Test Config"
+        )
 
     def test_update_stf_title_with_comparison_traces(self):
         """Test title update with comparison traces visible"""
@@ -1077,7 +1140,7 @@ class TestUpdateSTFTitleCallback:
                 }
             },
         }
-        
+
         # Main STF hidden, but comparison trace shows STF data
         result = polar_ui.update_stf_title_on_restyle(restyle_data, figure, "STF")
         assert result["layout"]["title"]["text"] == "MacCready Speed-to-Fly"
