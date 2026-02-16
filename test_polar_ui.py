@@ -349,6 +349,23 @@ class TestValidateUnits:
         """Test that None defaults to 'Metric'"""
         assert polar_ui.validate_units(None) == "Metric"
 
+    def test_validate_units_prevents_keyerror(self):
+        """Test that validate_units prevents KeyError when accessing UNIT_CHOICES"""
+        # Test with legacy "US" value
+        validated = polar_ui.validate_units("US")
+        assert validated in polar_ui.UNIT_CHOICES
+        assert polar_ui.UNIT_CHOICES[validated] is not None
+        
+        # Test with invalid value
+        validated = polar_ui.validate_units("InvalidValue")
+        assert validated in polar_ui.UNIT_CHOICES
+        assert polar_ui.UNIT_CHOICES[validated] is not None
+        
+        # Test with None
+        validated = polar_ui.validate_units(None)
+        assert validated in polar_ui.UNIT_CHOICES
+        assert polar_ui.UNIT_CHOICES[validated] is not None
+
 
 class TestInitialData:
     """Test cases for initial data structures"""
