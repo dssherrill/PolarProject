@@ -103,7 +103,7 @@ US_MPH_UNITS = {
     "Wing Area": ureg("ft**2"),
     "Pressure": ureg("lbs/ft**2"),
 }
-UNIT_CHOICES = {"Metric": METRIC_UNITS, "US": US_UNITS, "US MPH": US_MPH_UNITS}
+UNIT_CHOICES = {"Metric": METRIC_UNITS, "US, Knots": US_UNITS, "US, MPH": US_MPH_UNITS}
 
 
 def get_cached_glider(glider_name, current_glider_info) -> glider.Glider:
@@ -540,7 +540,7 @@ def add_units_selection():
     """
     Create a card containing a labeled radio control for selecting the unit system.
 
-    The control offers "Metric" and "US" options, defaults to "Metric", and persists the user's choice to local storage.
+    The control offers "Metric", "US, Knots", and "US, MPH" options, defaults to "Metric", and persists the user's choice to local storage.
 
     Returns:
         html.Div: A Dash HTML container wrapping a Bootstrap Card with the labeled RadioItems control (id="radio-units").
@@ -556,7 +556,7 @@ def add_units_selection():
                             html_for="radio-units",
                         ),
                         dbc.RadioItems(
-                            options=["Metric", "US", "US MPH"],
+                            options=["Metric", "US, Knots", "US, MPH"],
                             value="Metric",
                             inline=False,
                             id="radio-units",
@@ -934,7 +934,7 @@ def process_unit_change(
     Convert and synchronize pilot weight, wing loading, and airmass speeds to the selected units; compute derived quantities (gross weight and minimum wing loading); produce display labels, placeholders, and a glider-spec table suitable for the UI; and return updated stored-state payloads.
 
     Parameters:
-        units: Selected unit system name (e.g., "Metric" or "US").
+        units: Selected unit system name (e.g., "Metric", "US, Knots" or "US, MPH").
         weight_or_loading: Which input mode is active ("Pilot Weight" or "Wing Loading").
         glider_name: Selected glider name; defaults to the application's default glider when omitted.
         pilot_weight_in: User-entered pilot weight in the selected units, or None.
