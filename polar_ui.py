@@ -106,6 +106,28 @@ US_MPH_UNITS = {
 UNIT_CHOICES = {"Metric": METRIC_UNITS, "US, Knots": US_UNITS, "US, MPH": US_MPH_UNITS}
 
 
+def validate_units(units):
+    """
+    Validate and normalize unit choice from stored settings.
+
+    Protects against bad data by converting legacy or invalid unit choices:
+    - "US" (legacy value) → "US, Knots"
+    - Any other unknown value → "Metric" (default)
+
+    Parameters:
+        units: Unit choice string from user settings or component value
+
+    Returns:
+        str: A valid unit choice string that exists in UNIT_CHOICES
+    """
+    if units == "US":
+        return "US, Knots"
+    elif units in UNIT_CHOICES:
+        return units
+    else:
+        return "Metric"
+
+
 def get_cached_glider(glider_name, current_glider_info) -> glider.Glider:
     """
     Get or create a cached Glider instance to avoid duplicate CSV parsing.
@@ -976,6 +998,9 @@ def process_unit_change(
         set_props("wing-loading-row", {"className": "mb-3"})
         set_props("pilot-weight-row", {"className": "d-none"})
 
+    # Validate and normalize units to protect against bad data
+    units = validate_units(units)
+
     # setup units
     selected_units = UNIT_CHOICES[units]
     weight_units = selected_units["Weight"]
@@ -1414,6 +1439,9 @@ def update_graph(
     logger.info(
         f"update_graph input parameters: {degree=}, {glider_name=}, {maccready=}, {goal_function=}, {show_debug_graphs=}, {write_excel_file=}\n{save_comparison=}, {clear_comparison=}, {subtract_compare=}, {units=}, {weight_or_loading=} "
     )
+
+    # Validate and normalize units to protect against bad data
+    units = validate_units(units)
 
     # Setup units
     selected_units = UNIT_CHOICES[units]
