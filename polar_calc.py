@@ -461,7 +461,7 @@ class Polar:
             else:
                 Vstf[i] = v
                 Vavg[i] = self.v_avg(v, mc.magnitude)
-                S = self.sink(v) - self.__v_air_vert
+                S = self.sink(v)
                 LD[i] = v / (-S)
                 solver_result[i] = self.goal_function(v, mc.magnitude)
                 initial_guess = v
