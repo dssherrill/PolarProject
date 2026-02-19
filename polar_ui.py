@@ -1604,7 +1604,12 @@ def update_graph(
             # Sanitize glider name to avoid filesystem errors with invalid characters
             sanitized_glider_name = sanitize_filename(glider_name)
             excel_outfile_name = f"{sanitized_glider_name} stf.xlsx"
-            df_out.to_excel(excel_outfile_name, sheet_name="STF", index=False)
+            df_out.pint.dequantify().to_excel(
+                excel_outfile_name,
+                sheet_name="STF",
+                index=True,
+                index_label="Row",
+            )
 
             logger.info(f'File "{excel_outfile_name}" created successfully')
 
