@@ -150,7 +150,8 @@ class Polar:
             include_airmass (bool): If True, add the configured ambient vertical airspeed (positive = descent) to the sink rate; if False, omit ambient vertical motion.
 
         Returns:
-            float: Sink rate in meters per second; negative values indicate climb, positive values indicate descent.
+            float: Sink rate in meters per second; negative values indicate the glider is descending (sinking),
+                   positive values indicate net climb (e.g., in strong lift that exceeds the polar sink rate).
         """
         w = self.__weight_factor if weight_correction else 1.0
         s = w * self.__sink_poly(v / w)
