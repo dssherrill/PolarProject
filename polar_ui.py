@@ -78,6 +78,42 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # Expose server for deployment platforms (Railway, Heroku, etc.)
 server = app.server
 
+# Embed Statcounter analytics tracking code
+app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+        <!-- Default Statcounter code for Glider Polar Comparison
+        Tool https://polars.up.railway.app/ -->
+        <script type="text/javascript">
+        var sc_project=13204526;
+        var sc_invisible=1;
+        var sc_security="f8cb3f6d";
+        </script>
+        <script type="text/javascript"
+        src="https://www.statcounter.com/counter/counter.js"
+        async></script>
+        <noscript><div class="statcounter"><a title="Web Analytics"
+        href="https://statcounter.com/" target="_blank"><img
+        class="statcounter"
+        src="https://c.statcounter.com/13204526/0/f8cb3f6d/1/"
+        alt="Web Analytics"
+        referrerPolicy="no-referrer-when-downgrade"></a></div></noscript>
+        <!-- End of Statcounter Code -->
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
+
 # polynomial fit degree (order)
 DEFAULT_POLYNOMIAL_DEGREE = 5
 
