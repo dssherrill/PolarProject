@@ -75,6 +75,29 @@ DEFAULT_GLIDER_NAME = "ASW 28"
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # app = Dash(external_stylesheets=[dbc.themes.SLATE])
 
+# Cloudflare Web Analytics
+app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+        <!-- Cloudflare Web Analytics -->
+        <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2d1fe81cfafc4609859911a8464f490e"}'></script>
+        <!-- End Cloudflare Web Analytics -->
+    </body>
+</html>
+"""
+
 # Expose server for deployment platforms (Railway, Heroku, etc.)
 server = app.server
 
