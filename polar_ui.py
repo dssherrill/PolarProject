@@ -75,25 +75,34 @@ DEFAULT_GLIDER_NAME = "ASW 28"
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # app = Dash(external_stylesheets=[dbc.themes.SLATE])
 
-# Cloudflare Web Analytics
-app.index_string = """<!DOCTYPE html>
+# Cloudflare Web Analytics – token read from environment so it can be rotated
+# without a code change.  If CF_BEACON_TOKEN is unset the snippet is omitted.
+_cf_beacon_token = os.getenv("CF_BEACON_TOKEN")
+_cf_analytics_snippet = (
+    f"""<!-- Cloudflare Web Analytics -->
+        <script defer src='https://static.cloudflareinsights.com/beacon.min.js' """
+    f"""data-cf-beacon='{{"token": "{_cf_beacon_token}"}}'></script>
+        <!-- End Cloudflare Web Analytics -->"""
+    if _cf_beacon_token
+    else ""
+)
+
+app.index_string = f"""<!DOCTYPE html>
 <html>
     <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
+        {{%metas%}}
+        <title>{{%title%}}</title>
+        {{%favicon%}}
+        {{%css%}}
     </head>
     <body>
-        {%app_entry%}
+        {{%app_entry%}}
         <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
+            {{%config%}}
+            {{%scripts%}}
+            {{%renderer%}}
         </footer>
-        <!-- Cloudflare Web Analytics -->
-        <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "2d1fe81cfafc4609859911a8464f490e"}'></script>
-        <!-- End Cloudflare Web Analytics -->
+        {_cf_analytics_snippet}
     </body>
 </html>
 """
