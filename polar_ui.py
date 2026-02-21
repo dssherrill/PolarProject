@@ -79,14 +79,14 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # without a code change.  If CF_BEACON_TOKEN is unset or invalid the snippet is
 # omitted.  Tokens are validated against CF's hex/UUID format to prevent
 # quotes or backslashes from breaking the embedded JSON/HTML.
-_CF_TOKEN_PATTERN = re.compile(r"^[0-9a-fA-F]{32}$")
+_CF_TOKEN_PATTERN = re.compile(r"[0-9a-fA-F]{32}")
 
 _raw_cf_token = os.getenv("CF_BEACON_TOKEN", "").strip()
-_cf_beacon_token = _raw_cf_token if _CF_TOKEN_PATTERN.match(_raw_cf_token) else None
+_cf_beacon_token = _raw_cf_token if _CF_TOKEN_PATTERN.fullmatch(_raw_cf_token) else None
 
 if _cf_beacon_token is None and _raw_cf_token:
     logger.warning(
-        "CF_BEACON_TOKEN ignored – expected 32-char hex string, got %r",
+        "CF_BEACON_TOKEN ignored - expected 32-char hex string, got %r",
         _raw_cf_token,
     )
 
