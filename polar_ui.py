@@ -76,8 +76,20 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SANDSTONE])
 # app = Dash(external_stylesheets=[dbc.themes.SLATE])
 
 # Cloudflare Web Analytics – token read from environment so it can be rotated
-# without a code change.  If CF_BEACON_TOKEN is unset the snippet is omitted.
-_cf_beacon_token = os.getenv("CF_BEACON_TOKEN")
+# without a code change.  If CF_BEACON_TOKEN is unset or invalid the snippet is
+# omitted.  Tokens are validated against CF's hex/UUID format to prevent
+# quotes or backslashes from breaking the embedded JSON/HTML.
+_CF_TOKEN_PATTERN = re.compile(r"^[0-9a-fA-F]{32}$")
+
+_raw_cf_token = os.getenv("CF_BEACON_TOKEN", "").strip()
+_cf_beacon_token = _raw_cf_token if _CF_TOKEN_PATTERN.match(_raw_cf_token) else None
+
+if _cf_beacon_token is None and _raw_cf_token:
+    logger.warning(
+        "CF_BEACON_TOKEN ignored – expected 32-char hex string, got %r",
+        _raw_cf_token,
+    )
+
 _cf_analytics_snippet = (
     f"""<!-- Cloudflare Web Analytics -->
         <script defer src='https://static.cloudflareinsights.com/beacon.min.js' """
