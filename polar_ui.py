@@ -1711,6 +1711,9 @@ def update_graph(
 
     df_mc_table["MC"] = df_mc_table["MC"].pint.to(sink_units).pint.magnitude
     df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
+    df_mc_table["VavgExtra"] = (
+        df_mc_table["Vavg"].pint.to(ureg("mph")).pint.magnitude
+    )  # just in case
     df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
 
     # Store MacCready results in DataFrame for AG Grid
@@ -1742,6 +1745,21 @@ def update_graph(
         },
         #        "columnSize": "autoSize",
     ]
+
+    # If speed units are knots, add another column for Vavg in mph
+    # Nelson requested this. Because US contest tasks use statue miles,
+    # it is useful to have Vavg in mph, but STF should still be knots
+    # because the airspeed indicator in most US gliders is in knots.
+    if speed_units == ureg("knots"):
+        new_column_defs.insert(
+            3,
+            {
+                "field": "VavgExtra",
+                "type": "numericColumn",
+                "valueFormatter": {"function": "d3.format('.1f')(params.value)"},
+                "headerName": "Vavg (mph)",
+            },
+        )
 
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
