@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 
 import numpy as np
@@ -1709,13 +1709,6 @@ def update_graph(
 
     df_mc_table = current_polar.MacCready(mc_table_values)
 
-    df_mc_table["MC"] = df_mc_table["MC"].pint.to(sink_units).pint.magnitude
-    df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
-    df_mc_table["VavgExtra"] = (
-        df_mc_table["Vavg"].pint.to(ureg("mph")).pint.magnitude
-    )  # just in case
-    df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
-
     # Store MacCready results in DataFrame for AG Grid
     # AG Grid is arranged as MC, STF, Vavg, L/D
     new_column_defs = [
@@ -1746,11 +1739,28 @@ def update_graph(
         #        "columnSize": "autoSize",
     ]
 
-    # If speed units are knots, add another column for Vavg in mph
-    # Nelson requested this. Because US contest tasks use statue miles,
-    # it is useful to have Vavg in mph, but STF should still be knots
-    # because the airspeed indicator in most US gliders is in knots.
+    df_mc_table["MC"] = df_mc_table["MC"].pint.to(sink_units).pint.magnitude
+    df_mc_table["STF"] = df_mc_table["STF"].pint.to(speed_units).pint.magnitude
+
+    """
+    Nelson request: Show STF in knots but Vavg in mph.
+
+    Explanation: because US contest tasks use statute miles, it is useful to
+    have Vavg in mph when planning, but STF should still be knots because 
+    the airspeed indicator in most US gliders is in knots.
+
+    Implementation: if speed units are knots, add a column with Vavg in mph
+    to the STF table, but keep the Vavg(knots) column.
+
+    This is clumsy, but simply changing Vavg to mph would also be clumsy
+    because we could no longer plot STF(knots) and Vavg(mph) together on 
+    the graph. We could plot both in knots, but then the graph would not 
+    agree with the table.
+    """
     if speed_units == ureg("knots"):
+        df_mc_table["VavgExtra"] = (
+            df_mc_table["Vavg"].pint.to(ureg("mph")).pint.magnitude
+        )
         new_column_defs.insert(
             3,
             {
@@ -1760,6 +1770,8 @@ def update_graph(
                 "headerName": "Vavg (mph)",
             },
         )
+
+    df_mc_table["Vavg"] = df_mc_table["Vavg"].pint.to(speed_units).pint.magnitude
 
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
