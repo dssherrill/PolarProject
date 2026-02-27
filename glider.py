@@ -115,8 +115,8 @@ class Glider:
         # If p(x) is the polynomial with x in speed_units and output in sink_units, then
         # the converted polynomial q(v) with v in m/s satisfies q(v) = p(v / speed_to_ms) * sink_to_ms,
         # giving converted coefficient b_k = a_k * sink_to_ms / speed_to_ms**k.
-        speed_to_ms = (1.0 * speed_units).to("m/s").magnitude
-        sink_to_ms = (1.0 * sink_units).to("m/s").magnitude
+        speed_to_ms = speed_units.to("m/s").magnitude
+        sink_to_ms = sink_units.to("m/s").magnitude
         converted_coeffs = [
             a * sink_to_ms / (speed_to_ms**k) for k, a in enumerate(coefficients)
         ]
