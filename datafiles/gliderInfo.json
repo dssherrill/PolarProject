@@ -9,6 +9,17 @@
         "polarSinkUnits":"m\/s"
     },
     {
+        "name":"ASK 21 (poly)",
+        "wingArea":"17.95 m**2",
+        "referenceWeight":"470.0 kg",
+        "emptyWeight": "370.8 kg",
+        "polarCoefficients":[-1.770976, 0.031935, -0.00022827],
+        "polarSpeedUnits":"kph",
+        "polarSinkUnits":"m\/s",
+        "minSpeed":"65 kph",
+        "maxSpeed":"220 kph"
+    },
+    {
         "name":"ASW 28",
         "wingArea":"10.5 m**2",
         "referenceWeight":"325.0 kg",

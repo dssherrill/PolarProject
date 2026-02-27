@@ -81,7 +81,36 @@ class Polar:
             ).to_base_units()
             self.__weight_factor = np.sqrt(ratio.magnitude)
 
-        self.fit_polar(degree)
+        if current_glider.has_external_polynomial():
+            self._setup_external_polynomial()
+        else:
+            self.fit_polar(degree)
+
+    def _setup_external_polynomial(self):
+        """
+        Configure the polar polynomial directly from external coefficients provided by the glider.
+
+        Sets the sink-rate polynomial and its derivative from the glider's pre-built polynomial,
+        records the polynomial degree and speed range, and appends an informational message.
+        """
+        self.__sink_poly = self.__glider.external_polynomial()
+        self.__sink_deriv_poly = self.__sink_poly.deriv()
+        self.__degree = len(self.__sink_poly.coef) - 1
+        lo, hi = self.__glider.external_speed_range()
+        self.speed_range = (lo.magnitude, hi.magnitude)
+        self.__fit_results["Coefficients"] = self.__sink_poly.convert().coef
+        self.__fit_results[
+            "Messages"
+        ] += f"Using external polynomial of degree {self.__degree}.\n"
+
+    def get_degree(self):
+        """
+        Return the degree of the polynomial currently in use (fitted or external).
+
+        Returns:
+            int: Polynomial degree.
+        """
+        return self.__degree
 
     def fit_results(self):
         return self.__fit_results

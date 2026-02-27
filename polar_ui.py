@@ -1361,6 +1361,8 @@ def determine_title_from_figure(figure, compare_metric):
     Output(component_id="mcAgGrid", component_property="columnDefs"),
     Output(component_id="mcAgGrid", component_property="columnSize"),
     Output(component_id="poly-degree", component_property="value"),
+    Output(component_id="poly-degree", component_property="placeholder"),
+    Output(component_id="poly-degree", component_property="disabled"),
     Output(component_id="clear-comparison-button", component_property="disabled"),
     Output("df-out-store", "data"),
     Input("working-data-store", "data"),
@@ -1516,6 +1518,12 @@ def update_graph(
         current_glider, degree, goal_function, v_air_horiz, v_air_vert, pilot_weight
     )
     weight_factor = current_polar.get_weight_factor()
+
+    # When an external polynomial is in use, reflect its actual degree and disable the input.
+    using_external_poly = current_glider.has_external_polynomial()
+    if using_external_poly:
+        degree = current_polar.get_degree()
+    poly_degree_disabled = using_external_poly
 
     # This label is used in legends for both the polar graph and the STF graph
     graph_trace_label = (
@@ -1774,13 +1782,14 @@ def update_graph(
 
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
-    trace_data = go.Scatter(
-        x=current_glider.get_speed_data().to(speed_units).magnitude,
-        y=current_glider.get_sink_data().to(sink_units).magnitude,
-        mode="markers",
-        name="Polar Data",
-    )
-    polar_graph.add_trace(trace_data)
+    if not using_external_poly:
+        trace_data = go.Scatter(
+            x=current_glider.get_speed_data().to(speed_units).magnitude,
+            y=current_glider.get_sink_data().to(sink_units).magnitude,
+            mode="markers",
+            name="Polar Data",
+        )
+        polar_graph.add_trace(trace_data)
 
     # Graph the fit to the data on the same graph
     # Evaluate the polynomial for new points
@@ -1825,9 +1834,6 @@ def update_graph(
         goal_function_values = current_polar.goal_function(
             speed_mps_magnitude, maccready.magnitude
         )
-        # goal_function_values[
-        #     (goal_function_values >= 10) | (goal_function_values <= -10)
-        # ] = np.nan
         trace_goal = go.Scatter(
             x=speed,
             y=goal_function_values,
@@ -1835,7 +1841,7 @@ def update_graph(
         )
         polar_graph.add_trace(trace_goal)
 
-    if show_debug_graphs:
+    if show_debug_graphs and not using_external_poly:
         # Graph the residuals (difference between the data and the fit)
         speed_data = current_glider.get_speed_data().to(speed_units)
         sink_fit = current_polar.sink(
@@ -1919,11 +1925,12 @@ def update_graph(
     # Validate that fit_results returned valid data
     if (
         results is None
-        or results.get("R value") is None
-        or results.get("MSE") is None
         or results.get("Coefficients") is None
         or not hasattr(results["Coefficients"], "__getitem__")
         or len(results["Coefficients"]) < 2
+    ) or (
+        not using_external_poly
+        and (results.get("R value") is None or results.get("MSE") is None)
     ):
         logger.error(
             "Polynomial fit results are incomplete or invalid; cannot format LaTeX output"
@@ -1972,8 +1979,9 @@ def update_graph(
         latex_out = re.sub(r"([+-]) \(", r"\!$  $\1 (", latex_out)
 
         latex_out += "\nwhere $v$ is the airspeed; $Sink$ and $v$ are in m/s.\n\n"
-        latex_out += f"$R^2=$ {(results['R value']**2):.5f}\n"
-        latex_out += f"$MSE=$ {results['MSE']:.4g}\n\n"
+        if not using_external_poly:
+            latex_out += f"$R^2=$ {(results['R value']**2):.5f}\n"
+            latex_out += f"$MSE=$ {results['MSE']:.4g}\n\n"
 
         latex_out += results["Messages"]
 
@@ -1986,7 +1994,9 @@ def update_graph(
         df_mc_table.to_dict("records"),
         new_column_defs,
         "sizeToFit",
-        degree,
+        degree if not poly_degree_disabled else None,
+        DEFAULT_POLYNOMIAL_DEGREE if not poly_degree_disabled else degree,
+        poly_degree_disabled,
         (
             df_out_data_return is None
         ),  # disable the "Clear Comparison" button if there is no data saved

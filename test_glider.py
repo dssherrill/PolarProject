@@ -536,3 +536,113 @@ class TestGliderRegressionCases:
 
         finally:
             os.chdir(original_dir)
+
+class TestGliderExternalPolynomial:
+    """Tests for external polynomial polar support."""
+
+    @pytest.fixture
+    def poly_glider_info(self):
+        """Fixture with a glider using polarCoefficients instead of a CSV file."""
+        return pd.DataFrame(
+            {
+                "name": ["Test Poly Glider"],
+                "wingArea": ["10.0 m**2"],
+                "referenceWeight": ["300.0 kg"],
+                "emptyWeight": ["250.0 kg"],
+                "polarCoefficients": [[-2.0, 0.04, -0.0002]],
+                "polarSpeedUnits": ["kph"],
+                "polarSinkUnits": ["m/s"],
+                "minSpeed": ["70 kph"],
+                "maxSpeed": ["220 kph"],
+            }
+        )
+
+    def test_has_external_polynomial_true(self, poly_glider_info):
+        """Glider with polarCoefficients should report has_external_polynomial() == True."""
+        g = glider.Glider(poly_glider_info)
+        assert g.has_external_polynomial() is True
+
+    def test_has_external_polynomial_false(self, sample_glider_info, tmp_path):
+        """CSV-based glider should report has_external_polynomial() == False."""
+        datafiles_dir = tmp_path / "datafiles"
+        datafiles_dir.mkdir()
+        csv_file = datafiles_dir / "ASW 28.csv"
+        csv_file.write_text("80,-1.1\n100,-0.85\n120,-0.75\n150,-0.95")
+
+        original_dir = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+            g = glider.Glider(sample_glider_info)
+            assert g.has_external_polynomial() is False
+        finally:
+            os.chdir(original_dir)
+
+    def test_external_polynomial_is_not_none(self, poly_glider_info):
+        """external_polynomial() should return a non-None polynomial object."""
+        from numpy.polynomial import Polynomial as Poly
+
+        g = glider.Glider(poly_glider_info)
+        poly = g.external_polynomial()
+        assert poly is not None
+        assert isinstance(poly, Poly)
+
+    def test_external_polynomial_degree(self, poly_glider_info):
+        """Polynomial built from 3 coefficients should have degree 2."""
+        g = glider.Glider(poly_glider_info)
+        poly = g.external_polynomial()
+        assert len(poly.coef) - 1 == 2
+
+    def test_external_speed_range_m_per_s(self, poly_glider_info):
+        """Speed range from minSpeed/maxSpeed should be returned as pint Quantities in m/s."""
+        from units import ureg
+
+        g = glider.Glider(poly_glider_info)
+        lo, hi = g.external_speed_range()
+        # 70 kph = 70/3.6 m/s, 220 kph = 220/3.6 m/s
+        assert lo.units == ureg.meter / ureg.second
+        assert hi.units == ureg.meter / ureg.second
+        assert np.isclose(lo.magnitude, 70 / 3.6, rtol=1e-4)
+        assert np.isclose(hi.magnitude, 220 / 3.6, rtol=1e-4)
+
+    def test_polynomial_evaluated_in_ms_domain(self, poly_glider_info):
+        """Polynomial should evaluate sink in m/s when speed is given in m/s."""
+        g = glider.Glider(poly_glider_info)
+        poly = g.external_polynomial()
+        # Coefficients are [-2.0, 0.04, -0.0002] in kph/m/s domain.
+        # At v=100 kph = 100/3.6 m/s, expected sink from original polynomial:
+        # sink = -2.0 + 0.04*100 + (-0.0002)*100**2 = -2.0 + 4.0 - 2.0 = 0.0
+        v_ms = 100.0 / 3.6
+        result = poly(v_ms)
+        assert np.isclose(result, 0.0, atol=1e-6)
+
+    def test_integration_with_json_poly_glider(self):
+        """End-to-end: load 'ASK 21 (poly)' from gliderInfo.json."""
+        if not os.path.exists("./datafiles/gliderInfo.json"):
+            pytest.skip("datafiles/gliderInfo.json not available")
+
+        df_glider_info = pd.read_json("datafiles/gliderInfo.json")
+        poly_info = df_glider_info[df_glider_info["name"] == "ASK 21 (poly)"]
+
+        if poly_info.empty:
+            pytest.skip("ASK 21 (poly) not found in gliderInfo.json")
+
+        g = glider.Glider(poly_info)
+        assert g.has_external_polynomial() is True
+        assert g.name() == "ASK 21 (poly)"
+        lo, hi = g.external_speed_range()
+        assert lo < hi
+
+    def test_polar_data_accessors_return_none_for_poly_glider(self, poly_glider_info):
+        """polar_data_magnitude(), get_speed_data(), and get_sink_data() should return None for polynomial gliders."""
+        g = glider.Glider(poly_glider_info)
+        speed, sink = g.polar_data_magnitude()
+        assert speed is None
+        assert sink is None
+        assert g.get_speed_data() is None
+        assert g.get_sink_data() is None
+
+    def test_no_polar_file_name_needed_for_poly_glider(self, poly_glider_info):
+        """A DataFrame without a 'polarFileName' column should not raise when polarCoefficients is present."""
+        assert "polarFileName" not in poly_glider_info.columns
+        g = glider.Glider(poly_glider_info)
+        assert g.has_external_polynomial() is True
