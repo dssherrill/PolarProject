@@ -86,11 +86,11 @@
         "name":"Ventus 3T (poly)",
         "wingArea":"10.84 m**2",
         "referenceWeight":"430.0 kg",
-        "emptyWeight": "300.0 kg",
+        "emptyWeight": "360.0 kg",
         "polarCoefficients":[-1.86, 0.0298, -0.000170],
         "polarSpeedUnits":"kph",
         "polarSinkUnits":"m\/s",
         "minSpeed":"65 kph",
-        "maxSpeed":"250 kph"
+        "maxSpeed":"285 kph"
     }
 ]
