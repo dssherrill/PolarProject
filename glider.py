@@ -127,8 +127,8 @@ class Glider:
         ]
         self.__external_poly = Poly(converted_coeffs)
 
-        min_speed = ureg(current_glider["minSpeed"].iloc[0]).to("m/s").magnitude
-        max_speed = ureg(current_glider["maxSpeed"].iloc[0]).to("m/s").magnitude
+        min_speed = ureg(current_glider["minSpeed"].iloc[0]).to("m/s")
+        max_speed = ureg(current_glider["maxSpeed"].iloc[0]).to("m/s")
         self.__external_speed_range = (min_speed, max_speed)
 
     def has_external_polynomial(self):
@@ -146,10 +146,10 @@ class Glider:
 
     def external_speed_range(self):
         """
-        Return the valid speed range (min, max) in m/s for the external polynomial polar.
+        Return the valid speed range (min, max) for the external polynomial polar as pint Quantities in m/s.
 
         Returns:
-            tuple(float, float) or None
+            tuple(pint.Quantity, pint.Quantity) or None
         """
         return self.__external_speed_range
 

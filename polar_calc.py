@@ -96,7 +96,8 @@ class Polar:
         self.__sink_poly = self.__glider.external_polynomial()
         self.__sink_deriv_poly = self.__sink_poly.deriv()
         self.__degree = len(self.__sink_poly.coef) - 1
-        self.speed_range = self.__glider.external_speed_range()
+        lo, hi = self.__glider.external_speed_range()
+        self.speed_range = (lo.magnitude, hi.magnitude)
         self.__fit_results["Coefficients"] = self.__sink_poly.convert().coef
         self.__fit_results[
             "Messages"

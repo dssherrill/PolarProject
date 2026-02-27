@@ -593,12 +593,16 @@ class TestGliderExternalPolynomial:
         assert len(poly.coef) - 1 == 2
 
     def test_external_speed_range_m_per_s(self, poly_glider_info):
-        """Speed range from minSpeed/maxSpeed should be returned in m/s."""
+        """Speed range from minSpeed/maxSpeed should be returned as pint Quantities in m/s."""
+        from units import ureg
+
         g = glider.Glider(poly_glider_info)
         lo, hi = g.external_speed_range()
         # 70 kph = 70/3.6 m/s, 220 kph = 220/3.6 m/s
-        assert np.isclose(lo, 70 / 3.6, rtol=1e-4)
-        assert np.isclose(hi, 220 / 3.6, rtol=1e-4)
+        assert lo.units == ureg.meter / ureg.second
+        assert hi.units == ureg.meter / ureg.second
+        assert np.isclose(lo.magnitude, 70 / 3.6, rtol=1e-4)
+        assert np.isclose(hi.magnitude, 220 / 3.6, rtol=1e-4)
 
     def test_polynomial_evaluated_in_ms_domain(self, poly_glider_info):
         """Polynomial should evaluate sink in m/s when speed is given in m/s."""
