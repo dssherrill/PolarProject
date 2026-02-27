@@ -1361,6 +1361,7 @@ def determine_title_from_figure(figure, compare_metric):
     Output(component_id="mcAgGrid", component_property="columnDefs"),
     Output(component_id="mcAgGrid", component_property="columnSize"),
     Output(component_id="poly-degree", component_property="value"),
+    Output(component_id="poly-degree", component_property="placeholder"),
     Output(component_id="poly-degree", component_property="disabled"),
     Output(component_id="clear-comparison-button", component_property="disabled"),
     Output("df-out-store", "data"),
@@ -1993,7 +1994,8 @@ def update_graph(
         df_mc_table.to_dict("records"),
         new_column_defs,
         "sizeToFit",
-        degree,
+        degree if not poly_degree_disabled else None,
+        DEFAULT_POLYNOMIAL_DEGREE if not poly_degree_disabled else degree,
         poly_degree_disabled,
         (
             df_out_data_return is None
