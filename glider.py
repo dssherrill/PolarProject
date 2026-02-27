@@ -23,6 +23,8 @@ class Glider:
         self.__messages = ""
         self.__external_poly = None
         self.__external_speed_range = None
+        self.__speed_data = None
+        self.__sink_data = None
 
         # Get units from the passed DataFrame
         speed_units = ureg(current_glider["polarSpeedUnits"].iloc[0])
@@ -55,8 +57,11 @@ class Glider:
         """
         Load polar speed and sink data from a CSV file referenced by the provided glider record and store them as pint-quantified NumPy arrays.
 
+        This method is called only when the glider record does not provide
+        'polarCoefficients'; in that case 'polarFileName' is required.
+
         Parameters:
-            current_glider (pandas.DataFrame): A one-row DataFrame containing glider metadata; must include a 'polarFileName' column whose first value is the CSV filename located under ./datafiles/.
+            current_glider (pandas.DataFrame): A one-row DataFrame containing glider metadata; must include a 'polarFileName' column whose first value is the CSV filename located under ./datafiles/. 'polarFileName' is not required when 'polarCoefficients' is present.
             speed_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV speed column before converting to meters per second.
             sink_units (pint.Unit or pint.Quantity): Unit or quantity to apply to the CSV sink column before converting to meters per second.
 
@@ -152,17 +157,32 @@ class Glider:
         """
         Retrieve the loaded polar speed and sink datasets.
 
+        Not available for gliders that use an external polynomial (i.e., when
+        has_external_polynomial() is True); returns (None, None) in that case.
+
         Returns:
             tuple: (speed_data, sink_data)
-                speed_data: Sequence of speeds as floats in meters per second.
-                sink_data: Corresponding sink rates as floats in meters per second.
+                speed_data: Sequence of speeds as floats in meters per second, or None.
+                sink_data: Corresponding sink rates as floats in meters per second, or None.
         """
+        if self.__speed_data is None:
+            return None, None
         return self.__speed_data.magnitude, self.__sink_data.magnitude
 
     def get_speed_data(self):
+        """
+        Return the polar speed data as a pint Quantity array in m/s.
+
+        Returns None for gliders that use an external polynomial.
+        """
         return self.__speed_data
 
     def get_sink_data(self):
+        """
+        Return the polar sink data as a pint Quantity array in m/s.
+
+        Returns None for gliders that use an external polynomial.
+        """
         return self.__sink_data
 
     def reference_weight(self):

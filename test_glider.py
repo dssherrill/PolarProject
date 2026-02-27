@@ -627,3 +627,18 @@ class TestGliderExternalPolynomial:
         assert g.name() == "ASK 21 (poly)"
         lo, hi = g.external_speed_range()
         assert lo < hi
+
+    def test_polar_data_accessors_return_none_for_poly_glider(self, poly_glider_info):
+        """polar_data_magnitude(), get_speed_data(), and get_sink_data() should return None for polynomial gliders."""
+        g = glider.Glider(poly_glider_info)
+        speed, sink = g.polar_data_magnitude()
+        assert speed is None
+        assert sink is None
+        assert g.get_speed_data() is None
+        assert g.get_sink_data() is None
+
+    def test_no_polar_file_name_needed_for_poly_glider(self, poly_glider_info):
+        """A DataFrame without a 'polarFileName' column should not raise when polarCoefficients is present."""
+        assert "polarFileName" not in poly_glider_info.columns
+        g = glider.Glider(poly_glider_info)
+        assert g.has_external_polynomial() is True
