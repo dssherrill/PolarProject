@@ -1,96 +1,113 @@
 [
-        {
-        "name":"ASK 21",
-        "wingArea":"17.95 m**2",
-        "referenceWeight":"470.0 kg",
+    {
+        "name": "ASK 21",
+        "wingArea": "17.95 m**2",
+        "referenceWeight": "470.0 kg",
         "emptyWeight": "370.8 kg",
-        "polarFileName":"ASK 21.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "ASK 21.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"ASK 21 (poly)",
-        "wingArea":"17.95 m**2",
-        "referenceWeight":"470.0 kg",
+        "name": "ASK 21 (poly)",
+        "wingArea": "17.95 m**2",
+        "referenceWeight": "470.0 kg",
         "emptyWeight": "370.8 kg",
-        "polarCoefficients":[-1.770976, 0.031935, -0.00022827],
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s",
-        "minSpeed":"65 kph",
-        "maxSpeed":"220 kph"
+        "polarCoefficients": [
+            -1.770976,
+            0.031935,
+            -0.00022827
+        ],
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s",
+        "minSpeed": "65 kph",
+        "maxSpeed": "220 kph"
     },
     {
-        "name":"ASW 28",
-        "wingArea":"10.5 m**2",
-        "referenceWeight":"325.0 kg",
+        "name": "ASW 28",
+        "wingArea": "10.5 m**2",
+        "referenceWeight": "325.0 kg",
         "emptyWeight": "268.0 kg",
-        "polarFileName":"ASW 28.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "ASW 28.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"Duo Discus T",
-        "wingArea":"16.4 m**2",
-        "referenceWeight":"700.0 kg",
+        "name": "Duo Discus T",
+        "wingArea": "16.4 m**2",
+        "referenceWeight": "700.0 kg",
         "emptyWeight": "462.5 kg",
-        "polarFileName":"Duo Discus T.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "Duo Discus T.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"JS3 JET 15m",
-        "wingArea":"8.75 m**2",
-        "referenceWeight":"525.0 kg",
+        "name": "JS3 JET 15m",
+        "wingArea": "8.75 m**2",
+        "referenceWeight": "525.0 kg",
         "emptyWeight": "318.0 kg",
-        "polarFileName":"JS3 JET 15m.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "JS3 JET 15m.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"JS3 JET 18m",
-        "wingArea":"9.95 m**2",
-        "referenceWeight":"597.0 kg",
+        "name": "JS3 JET 18m",
+        "wingArea": "9.95 m**2",
+        "referenceWeight": "597.0 kg",
         "emptyWeight": "328.0 kg",
-        "polarFileName":"JS3 JET 18m.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "JS3 JET 18m.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"SGS 1-26E",
-        "wingArea":"160 ft**2",        
-        "referenceWeight":"700.0 lbs",
+        "name": "SGS 1-26E",
+        "wingArea": "160 ft**2",
+        "referenceWeight": "700.0 lbs",
         "emptyWeight": "471.0 lbs",
-        "polarFileName":"SGS 1-26E.csv",
-        "polarSpeedUnits":"mph",
-        "polarSinkUnits":"ft\/sec"
+        "polarFileName": "SGS 1-26E.csv",
+        "polarSpeedUnits": "mph",
+        "polarSinkUnits": "ft\/sec"
     },
     {
-        "name":"SGS 1-35C",
-        "wingArea":"103.8 ft**2",        
-        "referenceWeight":"565.0 lbs",
+        "name": "SGS 2-33B",
+        "wingArea": "219.48 ft**2",
+        "referenceWeight": "1040.0 lbs",
+        "emptyWeight": "660.0 lbs",
+        "polarFileName": "SGS 2-33B.csv",
+        "polarSpeedUnits": "mph",
+        "polarSinkUnits": "ft\/sec"
+    },
+    {
+        "name": "SGS 1-35C",
+        "wingArea": "103.8 ft**2",
+        "referenceWeight": "565.0 lbs",
         "emptyWeight": "454.0 lbs",
-        "polarFileName":"SGS 1-35C.csv",
-        "polarSpeedUnits":"mph",
-        "polarSinkUnits":"ft\/sec"
+        "polarFileName": "SGS 1-35C.csv",
+        "polarSpeedUnits": "mph",
+        "polarSinkUnits": "ft\/sec"
     },
     {
-        "name":"Ventus 2cT",
-        "wingArea":"9.7 m**2",
-        "referenceWeight":"565.0 kg",
+        "name": "Ventus 2cT",
+        "wingArea": "9.7 m**2",
+        "referenceWeight": "565.0 kg",
         "emptyWeight": "360.0 kg",
-        "polarFileName":"Ventus 2cT.csv",
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s"
+        "polarFileName": "Ventus 2cT.csv",
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s"
     },
     {
-        "name":"Ventus 3T (poly)",
-        "wingArea":"10.84 m**2",
-        "referenceWeight":"430.0 kg",
+        "name": "Ventus 3T (poly)",
+        "wingArea": "10.84 m**2",
+        "referenceWeight": "430.0 kg",
         "emptyWeight": "300.0 kg",
-        "polarCoefficients":[-1.86, 0.0298, -0.000170],
-        "polarSpeedUnits":"kph",
-        "polarSinkUnits":"m\/s",
-        "minSpeed":"65 kph",
-        "maxSpeed":"250 kph"
+        "polarCoefficients": [
+            -1.86,
+            0.0298,
+            -0.000170
+        ],
+        "polarSpeedUnits": "kph",
+        "polarSinkUnits": "m\/s",
+        "minSpeed": "65 kph",
+        "maxSpeed": "250 kph"
     }
 ]
