@@ -602,6 +602,49 @@ def add_compare_buttons():
     )
 
 
+def add_polar_chart_type():
+    """
+    Create a card containing a labeled radio control for selecting the polar chart type.
+
+    The control offers "Sink vs Speed" and "L/D vs Speed" options, defaults to "Sink",
+    and persists the user's choice to local storage.
+
+    Returns:
+        html.Div: A Dash HTML container wrapping a Bootstrap Card with the labeled
+        RadioItems control (id="radio-polar-chart-type").
+    """
+    return html.Div(
+        [
+            dbc.Card(
+                dbc.Stack(
+                    [
+                        dbc.Label(
+                            "Polar chart:",
+                            className="text-primary fs-5",
+                            html_for="radio-polar-chart-type",
+                        ),
+                        dbc.RadioItems(
+                            options=[
+                                {"label": "Sink vs Speed", "value": "Sink"},
+                                {"label": "L/D vs Speed", "value": "L/D"},
+                            ],
+                            value="Sink",
+                            inline=False,
+                            id="radio-polar-chart-type",
+                            persistence=True,
+                            persistence_type="local",
+                            className="ms-3",
+                        ),
+                    ],
+                    direction="horizontal",
+                    className="hstack m-3",
+                ),
+                className="border-primary mb-2",
+            ),
+        ],
+    )
+
+
 def add_units_selection():
     """
     Create a card containing a labeled radio control for selecting the unit system.
@@ -801,6 +844,7 @@ app.layout = dbc.Container(
                 dbc.Col(
                     [
                         add_units_selection(),
+                        add_polar_chart_type(),
                         add_weight_choice(),
                         add_graph("graph-polar"),
                     ],
@@ -1376,6 +1420,7 @@ def determine_title_from_figure(figure, compare_metric):
     Input(component_id="clear-comparison-button", component_property="n_clicks"),
     Input(component_id="radio-subtract-compare", component_property="value"),
     Input(component_id="radio-compare-metric", component_property="value"),
+    Input(component_id="radio-polar-chart-type", component_property="value"),
     State(component_id="radio-units", component_property="value"),
     State(component_id="radio-weight-or-loading", component_property="value"),
     State("df-out-store", "data"),
@@ -1392,6 +1437,7 @@ def update_graph(
     clear_comparison,
     subtract_compare,
     compare_metric,
+    polar_chart_type,
     units,
     weight_or_loading,
     df_out_data,
@@ -1782,16 +1828,9 @@ def update_graph(
 
     # Graph the polar data
     polar_graph = make_subplots(specs=[[{"secondary_y": True}]])
-    if not using_external_poly:
-        trace_data = go.Scatter(
-            x=current_glider.get_speed_data().to(speed_units).magnitude,
-            y=current_glider.get_sink_data().to(sink_units).magnitude,
-            mode="markers",
-            name="Polar Data",
-        )
-        polar_graph.add_trace(trace_data)
 
-    # Graph the fit to the data on the same graph
+    show_ld = polar_chart_type == "L/D"
+
     # Evaluate the polynomial for new points
     # Expand the speed range to show extrapolation used in STF calculation, if any.
     polar_speed_range = current_polar.speed_range
@@ -1821,13 +1860,48 @@ def update_graph(
         round((2 * graph_range[0]) / 2.0) - 1, 1 + round(2 * graph_range[1]) / 2.0, 0.5
     )
 
-    speed = (speed_mps_magnitude * ureg("m/s")).to(speed_units).magnitude
-    sink = current_polar.sink(
+    # Sink in m/s (unweighted, reference polar)
+    sink_mps = current_polar.sink(
         speed_mps_magnitude, weight_correction=False, include_airmass=False
     )
-    sink = (sink * ureg("m/s")).to(sink_units).magnitude
+    # L/D for reference polar: speed_mps / |sink_mps|  (sink is negative = descending)
+    # Guard against division by zero at stall or very low speed points
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ld_ref = np.where(sink_mps < 0.0, speed_mps_magnitude / (-sink_mps), np.nan)
 
-    trace_fit = go.Scatter(x=speed, y=sink, name=f"Fit, degree={degree}")
+    speed = (speed_mps_magnitude * ureg("m/s")).to(speed_units).magnitude
+    sink = (sink_mps * ureg("m/s")).to(sink_units).magnitude
+
+    if not using_external_poly:
+        if show_ld:
+            # L/D vs speed: data points use reference speeds (no weight adjustment on data)
+            speed_data_mps = current_glider.get_speed_data().magnitude
+            sink_data_mps = current_glider.get_sink_data().to("m/s").magnitude
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ld_data = np.where(
+                    sink_data_mps < 0.0,
+                    speed_data_mps / (-sink_data_mps),
+                    np.nan,
+                )
+            trace_data = go.Scatter(
+                x=current_glider.get_speed_data().to(speed_units).magnitude,
+                y=ld_data,
+                mode="markers",
+                name="Polar Data",
+            )
+        else:
+            trace_data = go.Scatter(
+                x=current_glider.get_speed_data().to(speed_units).magnitude,
+                y=current_glider.get_sink_data().to(sink_units).magnitude,
+                mode="markers",
+                name="Polar Data",
+            )
+        polar_graph.add_trace(trace_data)
+
+    if show_ld:
+        trace_fit = go.Scatter(x=speed, y=ld_ref, name=f"Fit, degree={degree}")
+    else:
+        trace_fit = go.Scatter(x=speed, y=sink, name=f"Fit, degree={degree}")
     polar_graph.add_trace(trace_fit)
 
     if show_debug_graphs:
@@ -1842,44 +1916,48 @@ def update_graph(
         polar_graph.add_trace(trace_goal)
 
     if show_debug_graphs and not using_external_poly:
-        # Graph the residuals (difference between the data and the fit)
-        speed_data = current_glider.get_speed_data().to(speed_units)
-        sink_fit = current_polar.sink(
-            current_glider.get_speed_data().magnitude,
-            weight_correction=False,
-            include_airmass=False,
-        )
-        residual = (current_glider.get_sink_data() - (sink_fit * ureg("m/s"))).to(
-            sink_units
-        )
+        # Graph the residuals (difference between the data and the fit) — only for Sink chart
+        if not show_ld:
+            speed_data = current_glider.get_speed_data().to(speed_units)
+            sink_fit = current_polar.sink(
+                current_glider.get_speed_data().magnitude,
+                weight_correction=False,
+                include_airmass=False,
+            )
+            residual = (current_glider.get_sink_data() - (sink_fit * ureg("m/s"))).to(
+                sink_units
+            )
+            trace_residuals = go.Scatter(
+                x=speed_data.magnitude, y=residual.magnitude, name="Residuals"
+            )
+            polar_graph.add_trace(trace_residuals, secondary_y=True)
 
-        trace_residuals = go.Scatter(
-            x=speed_data.magnitude, y=residual.magnitude, name="Residuals"
-        )
-        polar_graph.add_trace(trace_residuals, secondary_y=True)
-
-    # Add the weight-adjusted polar, but only if the all-up weight differs from the reference weight
+    # Add the weight-adjusted polar, but only if the all-up weight differs from the reference weight.
+    # For both Sink and L/D charts: weight-adjusted speed = speed * weight_factor,
+    # weight-adjusted sink = sink * weight_factor, so L/D is unchanged but x-axis shifts.
     if weight_factor != 1.0 or v_air_vert != 0.0:
-        # sink = (current_polar.sink(speed_mps_magnitude, weight_correction=True, include_airmass=False)*ureg('m/s')).to(sink_units).magnitude
-        trace_weight_adjusted = go.Scatter(
-            x=speed * weight_factor,
-            y=sink * weight_factor,
-            name=graph_trace_label,
-        )
+        if show_ld:
+            trace_weight_adjusted = go.Scatter(
+                x=speed * weight_factor,
+                y=ld_ref,  # L/D values are identical; only the speed axis shifts
+                name=graph_trace_label,
+            )
+        else:
+            trace_weight_adjusted = go.Scatter(
+                x=speed * weight_factor,
+                y=sink * weight_factor,
+                name=graph_trace_label,
+            )
         polar_graph.add_trace(trace_weight_adjusted)
-    """
-    # Alternate adjustment: Add the weight-adjusted polar, but only if the all-up weight differs from the reference weight
-    if (weight_factor != 1.0 or v_air_vert != 0.0):
-        sink = (current_polar.sink(speed_mps_magnitude, weight_correction=True, include_airmass=False)*ureg('m/s')).to(sink_units).magnitude
-        trace_weight_adjusted = go.Scatter(
-            x=speed,
-            y=sink,
-            name=f"Alternate adjustment")
-        polar_graph.add_trace(trace_weight_adjusted)
-    """
+
+    if show_ld:
+        polar_yaxis_title = "L/D"
+    else:
+        polar_yaxis_title = f"Sink ({sink_units.units:~P})"
+
     polar_graph.update_layout(
         xaxis_title=f"Speed ({speed_units.units:~P})",
-        yaxis_title=f"Sink ({sink_units.units:~P})",
+        yaxis_title=polar_yaxis_title,
         title={
             "text": f"{glider_name} Polar",
             "y": 0.9,
