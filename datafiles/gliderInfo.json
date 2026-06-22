@@ -42,6 +42,15 @@
         "polarSinkUnits": "m\/s"
     },
     {
+        "name": "Genesis 2",
+        "wingArea": "120 ft**2",
+        "referenceWeight": "696.0 lbs",
+        "emptyWeight": "530.0 lbs",
+        "polarFileName": "Genesis 2.csv",
+        "polarSpeedUnits": "knots",
+        "polarSinkUnits": "ft\/min"
+    },
+    {
         "name": "JS3 JET 15m",
         "wingArea": "8.75 m**2",
         "referenceWeight": "525.0 kg",
