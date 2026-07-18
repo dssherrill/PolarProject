@@ -9,7 +9,7 @@
         "polarSinkUnits": "m\/s"
     },
     {
-        "name": "ASK 21 (poly)",
+        "name": "ASK 21 (quadratic)",
         "wingArea": "17.95 m**2",
         "referenceWeight": "470.0 kg",
         "emptyWeight": "370.8 kg",
